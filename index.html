@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legio</title>
+    <link rel="stylesheet" href="css/style.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="mainMenu" class="overlay">
+        <div class="menu-content">
+            <h1>Legio</h1>
+            <p class="subtitle">Command Your Legions</p>
+            <button id="btnStart" class="menu-btn">Start Game</button>
+            <button id="btnWatch" class="menu-btn">Watch Battle</button>
+            <button id="btnCampaign" class="menu-btn">Campaign</button>
+            <button id="btnModifiers" class="menu-btn small">Battle Modifiers</button>
+        </div>
+    </div>
+
+    <div id="mapSelect" class="overlay hidden">
+        <div class="menu-content">
+            <h2>Select Battlefield</h2>
+            <div class="map-grid">
+                <div class="map-card selected" data-map="grasslands">
+                    <div class="map-preview grasslands-preview"></div>
+                    <span>The Grasslands</span>
+                </div>
+                <div class="map-card" data-map="river">
+                    <div class="map-preview river-preview"></div>
+                    <span>River Crossing</span>
+                </div>
+                <div class="map-card" data-map="hillfort">
+                    <div class="map-preview hillfort-preview"></div>
+                    <span>King of the Hill</span>
+                </div>
+                <div class="map-card" data-map="dense_forest">
+                    <div class="map-preview dense-forest-preview"></div>
+                    <span>Dense Forest</span>
+                </div>
+                <div class="map-card" data-map="rolling_hills">
+                    <div class="map-preview rolling-hills-preview"></div>
+                    <span>Rolling Hills</span>
+                </div>
+                <div class="map-card" data-map="narrow_pass">
+                    <div class="map-preview narrow-pass-preview"></div>
+                    <span>Narrow Pass</span>
+                </div>
+                <div class="map-card" data-map="twin_rivers">
+                    <div class="map-preview twin-rivers-preview"></div>
+                    <span>Twin Rivers</span>
+                </div>
+                <div class="map-card" data-map="forest_river">
+                    <div class="map-preview forest-river-preview"></div>
+                    <span>Forest River</span>
+                </div>
+                <div class="map-card" data-map="scattered_rocks">
+                    <div class="map-preview scattered-rocks-preview"></div>
+                    <span>Scattered Rocks</span>
+                </div>
+                <div class="map-card" data-map="roman_road">
+                    <div class="map-preview roman-road-preview"></div>
+                    <span>Roman Road</span>
+                </div>
+                <div class="map-card" data-map="ambush">
+                    <div class="map-preview ambush-preview"></div>
+                    <span>Ambush</span>
+                </div>
+            </div>
+            <button id="btnBack" class="menu-btn small">Back</button>
+        </div>
+    </div>
+
+    <div id="modifiersScreen" class="overlay hidden"></div>
+    <div id="armySetup" class="overlay hidden"></div>
+    <div id="placementUI" class="overlay-bar hidden"></div>
+    <div id="battleUI" class="overlay-bar hidden"></div>
+    <div id="resultScreen" class="overlay hidden"></div>
+    <div id="campaignMap" class="overlay hidden"></div>
+    <div id="spectatorSetup" class="overlay hidden"></div>
+
+    <script src="js/map.js"></script>
+    <script src="js/unit.js?v=3"></script>
+    <script src="js/visibility.js?v=3"></script>
+    <script src="js/combat.js?v=3"></script>
+    <script src="js/ai.js?v=3"></script>
+    <script src="js/army.js?v=3"></script>
+    <script src="js/campaign.js?v=3"></script>
+    <script src="js/renderer.js?v=3"></script>
+    <script src="js/input.js?v=3"></script>
+    <script src="js/main.js?v=3"></script>
+</body>
+</html>
