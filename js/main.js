@@ -258,9 +258,21 @@ const Game = {
             { type: 'ambush', seed: 37, selector: '.ambush-preview' }
         ];
 
-        for (const m of maps) {
+        // Generate previews asynchronously — one per frame to avoid UI freeze
+        let idx = 0;
+        const generateNext = () => {
+            if (idx >= maps.length) return;
+            const m = maps[idx++];
+            this._generateOnePreview(m);
+            setTimeout(generateNext, 0);
+        };
+        generateNext();
+    },
+
+    _generateOnePreview(m) {
+        {  // block scope for saved state variables
             const el = document.querySelector(m.selector);
-            if (!el) continue;
+            if (!el) return;
 
             // Save current map state
             const savedSeed = GameMap._seed;
@@ -277,6 +289,14 @@ const Game = {
             const savedDitches = GameMap.ditches;
             const savedTwinRiver = GameMap._twinRiverData;
             const savedRoads = GameMap.roads;
+            const savedWidth = GameMap.width;
+            const savedHeight2 = GameMap.height;
+            const savedGridSize = GameMap.gridSize;
+
+            // Render at reduced resolution for thumbnails (480×270 instead of 1920×1080)
+            GameMap.width = 480;
+            GameMap.height = 270;
+            GameMap.gridSize = 4; // keep same grid size — fewer cells at smaller dimensions
 
             // Generate a mini map with fixed seed
             GameMap._seed = m.seed;
@@ -345,24 +365,18 @@ const Game = {
             GameMap._applyHillsToHeightmap();
             GameMap.peaks = [];
 
-            // Render to full-size canvas then scale down
+            // Render at reduced resolution directly
             GameMap.canvas = document.createElement('canvas');
             GameMap.canvas.width = GameMap.width;
             GameMap.canvas.height = GameMap.height;
             GameMap._renderMap();
 
-            // Create thumbnail canvas
-            const thumbW = el.clientWidth || 200;
-            const thumbH = el.clientHeight || 130;
-            const thumb = document.createElement('canvas');
-            thumb.width = thumbW * 2; // 2x for sharpness
-            thumb.height = thumbH * 2;
+            // Use rendered canvas directly as thumbnail
+            const thumb = GameMap.canvas;
             thumb.style.width = '100%';
             thumb.style.height = '100%';
             thumb.style.display = 'block';
             thumb.style.borderRadius = '2px';
-            const tctx = thumb.getContext('2d');
-            tctx.drawImage(GameMap.canvas, 0, 0, thumb.width, thumb.height);
 
             el.innerHTML = '';
             el.appendChild(thumb);
@@ -382,6 +396,9 @@ const Game = {
             GameMap.ditches = savedDitches;
             GameMap._twinRiverData = savedTwinRiver;
             GameMap.roads = savedRoads;
+            GameMap.width = savedWidth;
+            GameMap.height = savedHeight2;
+            GameMap.gridSize = savedGridSize;
         }
     },
 
