@@ -249,9 +249,11 @@ const Campaign = {
 
         container.innerHTML = `
             <div class="menu-content campaign-content shop-content">
-                <h2>\u{1FA99} Denarii Shop</h2>
-                <div class="coins-display shop-coins">\u{1FA99} <span id="shopCoins">${this.coins}</span> Denarii</div>
-                <div class="shop-battle-info">Preparing for Battle ${battleNum} \u2014 ${this._mapLabel(node.map)}</div>
+                <div class="shop-header">
+                    <h2>\u{1FA99} Denarii Shop</h2>
+                    <div class="coins-display shop-coins">\u{1FA99} <span id="shopCoins">${this.coins}</span> Denarii</div>
+                    <div class="shop-battle-info">Preparing for Battle ${battleNum} \u2014 ${this._mapLabel(node.map)}</div>
+                </div>
                 ${vetUpgradeHTML}
                 ${buffHTML}
                 ${mercHTML}

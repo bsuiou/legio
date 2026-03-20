@@ -960,6 +960,18 @@ h2 {
     overflow-y: auto;
 }
 
+.shop-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: linear-gradient(135deg, #e8d5b5 0%, #d4b896 50%, #c4a87a 100%);
+    padding: 16px 0 12px;
+    margin: -40px -70px 12px;
+    padding: 20px 70px 12px;
+    border-bottom: 1px solid rgba(139, 105, 20, 0.25);
+    text-align: center;
+}
+
 .shop-coins {
     font-size: 24px;
     margin-bottom: 4px;
