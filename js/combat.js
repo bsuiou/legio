@@ -1,7 +1,7 @@
 // Combat resolution system
 const Combat = {
     // Damage per second base (fraction of attacker strength)
-    DPS_FACTOR: 0.0276, // ~2.76% of strength per second (longer battles for morale dynamics)
+    DPS_FACTOR: 0.02484, // ~2.48% of strength per second (10% global reduction)
 
     // Combat efficiency: large units can't bring all troops to bear.
     // As a unit takes losses and shrinks toward cohort-size, efficiency rises to 1.0.
