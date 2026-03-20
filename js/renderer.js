@@ -113,9 +113,10 @@ const Renderer = {
         const sizeScale = 0.4 + 0.6 * hpRatio;
         ctx.scale(sizeScale, sizeScale);
 
-        // Colors
-        const fillColor = isPlayer ? 'rgba(40, 90, 40, 0.85)' : 'rgba(140, 50, 30, 0.85)';
-        const strokeColor = isPlayer ? '#1a4a1a' : '#6a2010';
+        // Colors — mercenaries get a distinct olive/gold tint
+        const isMerc = isPlayer && unit._isMercenary;
+        const fillColor = isMerc ? 'rgba(90, 80, 30, 0.85)' : isPlayer ? 'rgba(40, 90, 40, 0.85)' : 'rgba(140, 50, 30, 0.85)';
+        const strokeColor = isMerc ? '#4a4010' : isPlayer ? '#1a4a1a' : '#6a2010';
         const symbolColor = isPlayer ? '#c0e0c0' : '#f0c0a0';
 
         ctx.fillStyle = fillColor;

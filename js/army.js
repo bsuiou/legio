@@ -212,9 +212,10 @@ const Army = {
         const groupMap = {};
         for (let i = 0; i < this.rosterForPlacement.length; i++) {
             const r = this.rosterForPlacement[i];
-            const key = `${r.unit.type}_${r.unit.size}`;
+            const mercPrefix = r.unit._isMercenary ? 'merc_' : '';
+            const key = `${mercPrefix}${r.unit.type}_${r.unit.size}`;
             if (!groupMap[key]) {
-                groupMap[key] = { key, type: r.unit.type, size: r.unit.size, indices: [], placed: 0 };
+                groupMap[key] = { key, type: r.unit.type, size: r.unit.size, isMerc: !!r.unit._isMercenary, indices: [], placed: 0 };
                 groups.push(groupMap[key]);
             }
             groupMap[key].indices.push(i);
@@ -234,7 +235,8 @@ const Army = {
             const total = g.indices.length;
             const remaining = total - g.placed;
             const allDone = remaining === 0;
-            const label = `${tc.label} ${sc.label}`;
+            const mercLabel = g.isMerc ? 'Merc. ' : '';
+            const label = `${mercLabel}${tc.label} ${sc.label}`;
             const sym = unitSymbolHTML(g.type, g.size, true);
             return `<div class="placement-unit ${allDone ? 'placed' : ''} ${this._activeGroupKey === g.key ? 'selected' : ''}" data-group="${g.key}">
                 ${sym} ${label} <span style="opacity:0.7">(${remaining} left)</span>
