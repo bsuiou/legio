@@ -160,6 +160,10 @@ class Unit {
                 }
             }
         }
+        // Campaign cavalry speed buff
+        if (Campaign.active && this.side === 'player' && this.category === 'cavalry') {
+            speed *= Campaign.getCavalrySpeedBuff();
+        }
         return speed;
     }
 
@@ -468,6 +472,10 @@ class Unit {
         // Veteran defense: -10% damage taken
         if (this.veteran) {
             amount *= 0.90;
+        }
+        // Campaign armor upgrades (stackable)
+        if (Campaign.active && this.side === 'player') {
+            amount *= Campaign.getArmorBuff(this);
         }
         // Digging penalty: ×2 damage taken
         if (this.digging) {

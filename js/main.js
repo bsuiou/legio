@@ -58,6 +58,12 @@ const Game = {
                 document.getElementById('campaignMap').classList.remove('hidden');
                 break;
 
+            case 'CAMPAIGN_SHOP':
+                Campaign._resetBattleBuffs();
+                Campaign.renderShopScreen();
+                document.getElementById('campaignMap').classList.remove('hidden');
+                break;
+
             case 'ARMY_SETUP':
                 GameMap.init(this.selectedMap);
                 if (Campaign.active) {
@@ -76,6 +82,12 @@ const Game = {
                 if (Campaign.active) {
                     const node = Campaign._currentNodeData || Campaign.getCurrentNode();
                     AI.budget = node ? node.aBudget : 3000;
+                    // Deploy mercenaries (free units from shop)
+                    Campaign._deployMercenaries();
+                    // Apply veteran upgrades to deployed units
+                    for (const u of Army.playerUnits) {
+                        if (u._veteranId) Campaign._applyVetUpgrades(u);
+                    }
                 } else {
                     AI.budget = Army.budget;
                 }

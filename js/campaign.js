@@ -8,6 +8,102 @@ const Campaign = {
     _nextVetId: 0,
     _pendingFork: false,  // true after winning the fork battle, before choosing
 
+    // --- Denarii Shop ---
+    // Buffs that persist for one battle only
+    _battleBuffs: {
+        allDamage: 0,       // +5% per purchase, stacks
+        cavalrySpeed: 0,    // +15% per purchase (one-time)
+        fireArrows: 0,      // +20% archer damage (one-time)
+        scoutReport: false,  // reveal enemy army composition
+    },
+    // Mercenaries hired from shop (added to army for free, non-promotable)
+    _mercenaries: [],
+    // Veteran upgrade tracking: { vetId: { damageUpgrades: N, armorUpgrades: N } }
+    _veteranUpgrades: {},
+
+    _resetBattleBuffs() {
+        this._battleBuffs = { allDamage: 0, cavalrySpeed: 0, fireArrows: 0, scoutReport: false };
+        this._mercenaries = [];
+    },
+
+    // Get the total damage multiplier from buffs for a unit
+    getDamageBuff(unit) {
+        let mult = 1.0;
+        mult += this._battleBuffs.allDamage; // e.g. 0.05 per purchase
+        if (unit.type === UnitType.ARCHERS && this._battleBuffs.fireArrows > 0) {
+            mult += 0.20;
+        }
+        // Veteran damage upgrades (permanent, stackable)
+        if (unit._veteranId && this._veteranUpgrades[unit._veteranId]) {
+            mult += this._veteranUpgrades[unit._veteranId].damageUpgrades * 0.15;
+        }
+        return mult;
+    },
+
+    // Get the armor multiplier from buffs for a unit (lower = less damage taken)
+    getArmorBuff(unit) {
+        let mult = 1.0;
+        // Veteran armor upgrades (permanent, stackable)
+        if (unit._veteranId && this._veteranUpgrades[unit._veteranId]) {
+            mult -= this._veteranUpgrades[unit._veteranId].armorUpgrades * 0.15;
+        }
+        return Math.max(0.25, mult); // cap at 75% reduction
+    },
+
+    // Get cavalry speed bonus
+    getCavalrySpeedBuff() {
+        return this._battleBuffs.cavalrySpeed > 0 ? 1.15 : 1.0;
+    },
+
+    // Shop item definitions
+    _shopItems: [
+        {
+            id: 'upgrade_vet_damage', category: 'veteran', label: 'Sharpen Blades',
+            desc: '+15% damage for a veteran (stackable)', cost: 20,
+            icon: '\u2694\uFE0F', requiresVeteran: true, upgradeType: 'damage'
+        },
+        {
+            id: 'upgrade_vet_armor', category: 'veteran', label: 'Reinforce Armor',
+            desc: '+15% armor for a veteran (stackable)', cost: 20,
+            icon: '\u{1F6E1}\uFE0F', requiresVeteran: true, upgradeType: 'armor'
+        },
+        {
+            id: 'all_damage', category: 'buff', label: 'War Drums',
+            desc: 'All units +5% damage (this battle)', cost: 150,
+            icon: '\u{1F941}', repeatable: true
+        },
+        {
+            id: 'scout_report', category: 'buff', label: 'Scout Report',
+            desc: 'Reveal enemy army before battle', cost: 20,
+            icon: '\u{1F441}\uFE0F', once: true
+        },
+        {
+            id: 'fire_arrows', category: 'buff', label: 'Fire Arrows',
+            desc: 'Archers +20% damage (this battle)', cost: 80,
+            icon: '\u{1F3F9}', once: true
+        },
+        {
+            id: 'cavalry_speed', category: 'buff', label: 'War Horses',
+            desc: 'Cavalry +15% speed (this battle)', cost: 65,
+            icon: '\u{1F40E}', once: true
+        },
+        {
+            id: 'merc_light_inf', category: 'mercenary', label: 'Mercenary Skirmishers',
+            desc: 'Free Light Infantry Century (no veteran promotion)', cost: 60,
+            icon: '\u2694\uFE0F', mercType: 'light_infantry', mercSize: 'century'
+        },
+        {
+            id: 'merc_archers', category: 'mercenary', label: 'Mercenary Bowmen',
+            desc: 'Free Archer Century (no veteran promotion)', cost: 80,
+            icon: '\u{1F3F9}', mercType: 'archers', mercSize: 'century'
+        },
+        {
+            id: 'merc_cavalry', category: 'mercenary', label: 'Mercenary Riders',
+            desc: 'Free Light Cavalry Century (no veteran promotion)', cost: 100,
+            icon: '\u{1F40E}', mercType: 'light_cavalry', mercSize: 'century'
+        },
+    ],
+
     // Campaign sequence — 7 battles + 1 village event
     // Nodes 0-1: shared battles, Node 2: village event, Node 3: fork battle
     // Nodes 4-6 (path A) or 7-9 (path B): branch battles
@@ -67,6 +163,152 @@ const Campaign = {
         this.coins = 100;
         this.veteranRoster = [];
         this._nextVetId = 0;
+        this._veteranUpgrades = {};
+        this._resetBattleBuffs();
+        // Show shop before first battle
+        Game.setState('CAMPAIGN_SHOP');
+    },
+
+    // --- Shop Phase ---
+    renderShopScreen() {
+        const container = document.getElementById('campaignMap');
+        const node = this.getCurrentNode();
+        const battleNum = this.getCompletedBattleCount() + 1;
+
+        // Build veteran upgrade section
+        let vetUpgradeHTML = '';
+        if (this.veteranRoster.length > 0) {
+            vetUpgradeHTML = `<div class="shop-section">
+                <h3 class="shop-section-title">\u2605 Veteran Upgrades <span class="shop-cost-note">20 Denarii each</span></h3>
+                <div class="shop-vet-list">
+                    ${this.veteranRoster.map(v => {
+                        const tc = TYPE_CONFIG[v.type];
+                        const sc = SIZE_CONFIG[v.size];
+                        const ups = this._veteranUpgrades[v.id] || { damageUpgrades: 0, armorUpgrades: 0 };
+                        const dmgPct = (10 + ups.damageUpgrades * 15);
+                        const armPct = (10 + ups.armorUpgrades * 15);
+                        return `<div class="shop-vet-row">
+                            <span class="shop-vet-name">${unitSymbolHTML(v.type, v.size, true)} \u2605 ${tc.label} ${sc.label}</span>
+                            <span class="shop-vet-stats">
+                                <span class="vet-stat dmg" title="Damage bonus">+${dmgPct}% dmg</span>
+                                <span class="vet-stat arm" title="Armor bonus">-${armPct}% taken</span>
+                            </span>
+                            <span class="shop-vet-buttons">
+                                <button class="shop-vet-btn" onclick="Campaign._buyVetUpgrade('${v.id}','damage')" ${this.coins < 20 ? 'disabled' : ''} title="Sharpen Blades (+15% damage)">\u2694 +Dmg</button>
+                                <button class="shop-vet-btn" onclick="Campaign._buyVetUpgrade('${v.id}','armor')" ${this.coins < 20 ? 'disabled' : ''} title="Reinforce Armor (+15% armor)">\u{1F6E1} +Arm</button>
+                            </span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
+
+        // Build buff section
+        const buffItems = this._shopItems.filter(i => i.category === 'buff');
+        const buffHTML = `<div class="shop-section">
+            <h3 class="shop-section-title">\u{1F4DC} Battle Preparations</h3>
+            <div class="shop-items-grid">
+                ${buffItems.map(item => {
+                    let bought = false;
+                    if (item.once) {
+                        if (item.id === 'scout_report') bought = this._battleBuffs.scoutReport;
+                        if (item.id === 'fire_arrows') bought = this._battleBuffs.fireArrows > 0;
+                        if (item.id === 'cavalry_speed') bought = this._battleBuffs.cavalrySpeed > 0;
+                    }
+                    const canBuy = this.coins >= item.cost && !bought;
+                    return `<div class="shop-item ${bought ? 'bought' : ''} ${!canBuy && !bought ? 'too-expensive' : ''}" onclick="${canBuy ? `Campaign._buyBuff('${item.id}')` : ''}">
+                        <span class="shop-item-icon">${item.icon}</span>
+                        <span class="shop-item-label">${item.label}</span>
+                        <span class="shop-item-desc">${item.desc}</span>
+                        <span class="shop-item-cost">${bought ? '\u2714 Bought' : item.cost + ' \u{1FA99}'}</span>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+
+        // Build mercenary section
+        const mercItems = this._shopItems.filter(i => i.category === 'mercenary');
+        const mercHTML = `<div class="shop-section">
+            <h3 class="shop-section-title">\u{1F5E1}\uFE0F Hire Mercenaries <span class="shop-cost-note">fight free, no promotion</span></h3>
+            <div class="shop-items-grid">
+                ${mercItems.map(item => {
+                    const canBuy = this.coins >= item.cost;
+                    return `<div class="shop-item ${!canBuy ? 'too-expensive' : ''}" onclick="${canBuy ? `Campaign._buyMerc('${item.id}')` : ''}">
+                        <span class="shop-item-icon">${item.icon}</span>
+                        <span class="shop-item-label">${item.label}</span>
+                        <span class="shop-item-desc">${item.desc}</span>
+                        <span class="shop-item-cost">${item.cost} \u{1FA99}</span>
+                    </div>`;
+                }).join('')}
+            </div>
+            ${this._mercenaries.length > 0 ? `<div class="shop-merc-hired">Hired: ${this._mercenaries.map(m => {
+                const tc = TYPE_CONFIG[m.type]; const sc = SIZE_CONFIG[m.size];
+                return `${tc.label} ${sc.label}`;
+            }).join(', ')}</div>` : ''}
+        </div>`;
+
+        container.innerHTML = `
+            <div class="menu-content campaign-content shop-content">
+                <h2>\u{1FA99} Denarii Shop</h2>
+                <div class="coins-display shop-coins">\u{1FA99} <span id="shopCoins">${this.coins}</span> Denarii</div>
+                <div class="shop-battle-info">Preparing for Battle ${battleNum} \u2014 ${this._mapLabel(node.map)}</div>
+                ${vetUpgradeHTML}
+                ${buffHTML}
+                ${mercHTML}
+                <div class="shop-buttons">
+                    <button class="menu-btn" onclick="Campaign._exitShop()">Continue to Battle</button>
+                    <button class="menu-btn small" onclick="Campaign._exitShopToMap()">Back to Map</button>
+                </div>
+            </div>
+        `;
+    },
+
+    _buyVetUpgrade(vetId, upgradeType) {
+        if (this.coins < 20) return;
+        this.coins -= 20;
+        if (!this._veteranUpgrades[vetId]) {
+            this._veteranUpgrades[vetId] = { damageUpgrades: 0, armorUpgrades: 0 };
+        }
+        if (upgradeType === 'damage') {
+            this._veteranUpgrades[vetId].damageUpgrades++;
+        } else {
+            this._veteranUpgrades[vetId].armorUpgrades++;
+        }
+        this.renderShopScreen();
+    },
+
+    _buyBuff(itemId) {
+        const item = this._shopItems.find(i => i.id === itemId);
+        if (!item || this.coins < item.cost) return;
+        this.coins -= item.cost;
+
+        switch (itemId) {
+            case 'all_damage': this._battleBuffs.allDamage += 0.05; break;
+            case 'scout_report': this._battleBuffs.scoutReport = true; break;
+            case 'fire_arrows': this._battleBuffs.fireArrows = 1; break;
+            case 'cavalry_speed': this._battleBuffs.cavalrySpeed = 1; break;
+        }
+        this.renderShopScreen();
+    },
+
+    _buyMerc(itemId) {
+        const item = this._shopItems.find(i => i.id === itemId);
+        if (!item || this.coins < item.cost) return;
+        this.coins -= item.cost;
+        this._mercenaries.push({ type: item.mercType, size: item.mercSize });
+        this.renderShopScreen();
+    },
+
+    _exitShop() {
+        const node = this.getCurrentNode();
+        if (node.type === 'village') {
+            this.startVillageEvent();
+            return;
+        }
+        this.startBattle(node.id);
+    },
+
+    _exitShopToMap() {
         Game.setState('CAMPAIGN_MAP');
     },
 
@@ -263,7 +505,10 @@ const Campaign = {
                     ${this.veteranRoster.length > 0 ? ' \u2014 ' + this.veteranRoster.length + ' veteran' + (this.veteranRoster.length > 1 ? 's' : '') : ''}
                 </div>
                 ${forkUI}
-                <button class="menu-btn small" onclick="Campaign.active=false; Game.setState('MENU')" style="margin-top:8px;">Back to Menu</button>
+                <div style="margin-top:8px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                    ${!this._pendingFork ? `<button class="menu-btn" onclick="Game.setState('CAMPAIGN_SHOP')">\u{1FA99} Shop</button>` : ''}
+                    <button class="menu-btn small" onclick="Campaign.active=false; Game.setState('MENU')">Back to Menu</button>
+                </div>
             </div>
         `;
     },
@@ -290,6 +535,42 @@ const Campaign = {
         Army.budget = node.pBudget;
         Army.remaining = node.pBudget;
         Game.setState('ARMY_SETUP');
+    },
+
+    _renderScoutReport(node) {
+        // Pre-generate AI army to show composition
+        const oldBudget = AI.budget;
+        const oldUnits = AI.units;
+        AI.budget = node.aBudget;
+        AI.generateArmy();
+        const report = {};
+        for (const u of AI.units) {
+            const tc = TYPE_CONFIG[u.type]; const sc = SIZE_CONFIG[u.size];
+            const key = `${tc.label} ${sc.label}`;
+            report[key] = (report[key] || 0) + 1;
+        }
+        // Restore (will be re-generated at placement)
+        AI.units = oldUnits;
+        AI.budget = oldBudget;
+        const lines = Object.entries(report).map(([k, v]) => `${v}x ${k}`).join(', ');
+        return `<div style="font-size:11px; color:#6b5a3a; margin-top:2px; font-style:italic;">\u{1F441}\uFE0F Scout: ${lines}</div>`;
+    },
+
+    // Apply veteran upgrades to a deployed unit
+    _applyVetUpgrades(unit) {
+        if (!unit._veteranId || !this._veteranUpgrades[unit._veteranId]) return;
+        const ups = this._veteranUpgrades[unit._veteranId];
+        unit._vetDamageUps = ups.damageUpgrades;
+        unit._vetArmorUps = ups.armorUpgrades;
+    },
+
+    // Add mercenaries to the army (called at placement start)
+    _deployMercenaries() {
+        for (const m of this._mercenaries) {
+            const unit = new Unit(m.type, m.size, 'player');
+            unit._isMercenary = true; // won't be promoted to veteran
+            Army.playerUnits.push(unit);
+        }
     },
 
     // --- Village Event ---
@@ -405,7 +686,8 @@ const Campaign = {
                     <h2>Battle ${battleNum} \u2014 ${this._mapLabel(node.map)}</h2>
                     <div class="coins-display" style="margin-bottom:4px;">\u{1FA99} ${this.coins} Denarii</div>
                     <div class="points-display">Strength: <strong id="pointsLeft">${Army.remaining}</strong> / <span id="budgetTotal">${budget}</span></div>
-                    <div style="font-size:12px; color:#a05050; margin-top:4px;">Enemy Strength: ~${node.aBudget}</div>
+                    <div style="font-size:12px; color:#a05050; margin-top:4px;">Enemy Strength: ~${node.aBudget}${this._battleBuffs.scoutReport ? ' \u{1F441}\uFE0F' : ''}</div>
+                    ${this._battleBuffs.scoutReport ? this._renderScoutReport(node) : ''}
                 </div>
                 <div class="army-setup-grid">
                     <div class="unit-picker">
@@ -513,7 +795,15 @@ const Campaign = {
 
     onBattleResult(victory) {
         if (victory) {
-            this.coins += 100;
+            // Earnings: base 100 + 20% per battle number + 0.05 per surviving strength
+            const battleNum = this.getCompletedBattleCount() + 1;
+            const basePay = Math.round(100 * (1 + 0.20 * battleNum));
+            const aliveStrength = Army.playerUnits
+                .filter(u => u.alive)
+                .reduce((s, u) => s + SIZE_CONFIG[u.size].strength, 0);
+            const survivalBonus = Math.ceil(aliveStrength * 0.05);
+            this._lastEarnings = { base: basePay, survival: survivalBonus, total: basePay + survivalBonus };
+            this.coins += basePay + survivalBonus;
             this._collectSurvivors();
             const node = this._currentNodeData || this.getCurrentNode();
             if (node.fork) {
@@ -534,7 +824,7 @@ const Campaign = {
                 }
                 continue;
             }
-            if (!u._veteranId) {
+            if (!u._veteranId && !u._isMercenary) {
                 const vetId = 'vet_' + this._nextVetId++;
                 this.veteranRoster.push({
                     id: vetId, type: u.type, size: u.size,
@@ -605,7 +895,7 @@ const Campaign = {
         } else if (victory) {
             title = 'Victory!';
             titleClass = 'victory';
-            buttonHTML = `<button class="menu-btn" onclick="Game.setState('CAMPAIGN_MAP')">Continue Campaign</button>`;
+            buttonHTML = `<button class="menu-btn" onclick="Game.setState('CAMPAIGN_SHOP')">Continue Campaign</button>`;
         } else {
             title = 'Defeat \u2014 Campaign Over';
             titleClass = 'defeat';
@@ -620,7 +910,10 @@ const Campaign = {
                     <div>Duration: ${minutes}:${seconds.toString().padStart(2, '0')}</div>
                     <div>Your Strength: ${Math.round(pRemaining)} / ${pInitial}</div>
                     <div>Enemy Strength: 0 / ${eInitial}</div>
-                    ${victory ? `<div style="color:#8b6914; margin-top:8px;"><strong>+100 Denarii</strong> (Total: ${this.coins})</div>` : ''}
+                    ${victory && this._lastEarnings ? `<div style="color:#8b6914; margin-top:8px;">
+                        <strong>+${this._lastEarnings.total} Denarii</strong> (${this._lastEarnings.base} base + ${this._lastEarnings.survival} survival bonus)
+                        <div style="opacity:0.7; font-size:12px;">Total: ${this.coins} Denarii</div>
+                    </div>` : ''}
                 </div>
                 ${survivorsHTML}
                 ${buttonHTML}
