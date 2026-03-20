@@ -446,42 +446,38 @@ const Input = {
         cx /= n; cy /= n;
         const ddx = gx - cx, ddy = gy - cy;
         const dirLen = Math.sqrt(ddx * ddx + ddy * ddy);
-        // Direction unit vector (default: face right if clicking on self)
         const dirX = dirLen > 5 ? ddx / dirLen : 1;
         const dirY = dirLen > 5 ? ddy / dirLen : 0;
-        // Perpendicular
         const perpX = -dirY, perpY = dirX;
 
+        // Compute target positions for each slot
+        const positions = [];
         switch (formation) {
             case 'line': {
-                // Spread perpendicular to move direction
                 for (let i = 0; i < n; i++) {
                     const offset = (i - (n - 1) / 2) * spacing;
-                    selected[i].targetX = gx + perpX * offset;
-                    selected[i].targetY = gy + perpY * offset;
+                    positions.push({ x: gx + perpX * offset, y: gy + perpY * offset });
                 }
                 break;
             }
             case 'column': {
-                // Spread along move direction (leader at front)
                 for (let i = 0; i < n; i++) {
-                    const offset = -i * spacing; // negative = behind leader
-                    selected[i].targetX = gx + dirX * offset;
-                    selected[i].targetY = gy + dirY * offset;
+                    const offset = -i * spacing;
+                    positions.push({ x: gx + dirX * offset, y: gy + dirY * offset });
                 }
                 break;
             }
             case 'wedge': {
-                // V-shape: first unit at point, pairs fan out
-                selected[0].targetX = gx;
-                selected[0].targetY = gy;
+                positions.push({ x: gx, y: gy });
                 for (let i = 1; i < n; i++) {
                     const row = Math.ceil(i / 2);
                     const side = (i % 2 === 1) ? 1 : -1;
                     const backOffset = -row * spacing * 0.7;
                     const sideOffset = row * spacing * 0.6 * side;
-                    selected[i].targetX = gx + dirX * backOffset + perpX * sideOffset;
-                    selected[i].targetY = gy + dirY * backOffset + perpY * sideOffset;
+                    positions.push({
+                        x: gx + dirX * backOffset + perpX * sideOffset,
+                        y: gy + dirY * backOffset + perpY * sideOffset
+                    });
                 }
                 break;
             }
@@ -490,10 +486,19 @@ const Input = {
                 for (let i = 0; i < n; i++) {
                     const col = i % cols;
                     const row = Math.floor(i / cols);
-                    selected[i].targetX = gx + (col - cols / 2) * spacing;
-                    selected[i].targetY = gy + (row - Math.floor(n / cols) / 2) * spacing;
+                    positions.push({
+                        x: gx + (col - cols / 2) * spacing,
+                        y: gy + (row - Math.floor(n / cols) / 2) * spacing
+                    });
                 }
             }
+        }
+
+        // Assign units to nearest positions to avoid crossing paths
+        const assignment = this._matchUnitsToPositions(selected, positions);
+        for (let p = 0; p < assignment.length; p++) {
+            selected[assignment[p]].targetX = positions[p].x;
+            selected[assignment[p]].targetY = positions[p].y;
         }
 
         // Update attack-move targets if active
@@ -646,25 +651,46 @@ const Input = {
         return positions;
     },
 
+    _matchUnitsToPositions(units, positions) {
+        // Greedy nearest assignment: minimizes path crossing
+        const n = Math.min(units.length, positions.length);
+        const assignment = new Array(n);
+        const used = new Uint8Array(n);
+        for (let p = 0; p < n; p++) {
+            let bestUnit = -1, bestDist = Infinity;
+            for (let u = 0; u < n; u++) {
+                if (used[u]) continue;
+                const dx = units[u].x - positions[p].x;
+                const dy = units[u].y - positions[p].y;
+                const d = dx * dx + dy * dy;
+                if (d < bestDist) { bestDist = d; bestUnit = u; }
+            }
+            assignment[p] = bestUnit;
+            used[bestUnit] = 1;
+        }
+        return assignment; // assignment[posIndex] = unitIndex
+    },
+
     _applyLineDragPositions(selected, positions) {
+        const assignment = this._matchUnitsToPositions(selected, positions);
         if (Game.state === 'BATTLE') {
-            for (let i = 0; i < selected.length; i++) {
-                const u = selected[i];
+            for (let p = 0; p < assignment.length; p++) {
+                const u = selected[assignment[p]];
                 if (u.inCombat) Combat.disengage(u);
                 u.holdGround = false;
                 u.targetQueue = [];
                 u.idleTime = 0;
-                u.targetX = positions[i].x;
-                u.targetY = positions[i].y;
+                u.targetX = positions[p].x;
+                u.targetY = positions[p].y;
                 u.attackMove = false;
                 u.attackMoveTarget = null;
             }
         } else if (Game.state === 'PLACEMENT') {
             const allPlaced = Army.rosterForPlacement.every(r => r.placed);
             if (allPlaced) {
-                for (let i = 0; i < selected.length; i++) {
-                    selected[i].targetX = positions[i].x;
-                    selected[i].targetY = positions[i].y;
+                for (let p = 0; p < assignment.length; p++) {
+                    selected[assignment[p]].targetX = positions[p].x;
+                    selected[assignment[p]].targetY = positions[p].y;
                 }
             }
         }
