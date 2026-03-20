@@ -566,13 +566,9 @@ const Campaign = {
         unit._vetArmorUps = ups.armorUpgrades;
     },
 
-    // Add mercenaries to the army (called at placement start)
+    // Mercenaries are now added during army setup, so this is a no-op
     _deployMercenaries() {
-        for (const m of this._mercenaries) {
-            const unit = new Unit(m.type, m.size, 'player');
-            unit._isMercenary = true; // won't be promoted to veteran
-            Army.playerUnits.push(unit);
-        }
+        // Already added in renderCampaignSetupUI
     },
 
     // --- Village Event ---
@@ -663,6 +659,13 @@ const Campaign = {
         Army.remaining = budget;
         for (const v of this.veteranRoster) v.deployed = false;
 
+        // Pre-add mercenaries (free units, not removable)
+        for (const m of this._mercenaries) {
+            const unit = new Unit(m.type, m.size, 'player');
+            unit._isMercenary = true;
+            Army.playerUnits.push(unit);
+        }
+
         const options = Army.getUnitOptions();
         let vetsHTML = '';
         if (this.veteranRoster.length > 0) {
@@ -721,9 +724,11 @@ const Campaign = {
         if (!list) return;
         list.innerHTML = Army.playerUnits.map((u, i) => {
             const vet = u.veteran ? '\u2605 ' : '';
-            return `<div class="roster-item">
-                <span>${unitSymbolHTML(u.type, u.size, true)} ${vet}${u.getDisplayInfo()}</span>
-                <button class="remove-btn" data-index="${i}">Remove</button>
+            const isMerc = u._isMercenary;
+            const tag = isMerc ? '<span class="merc-tag">Mercenary</span>' : '';
+            return `<div class="roster-item ${isMerc ? 'merc-item' : ''}">
+                <span>${unitSymbolHTML(u.type, u.size, true)} ${vet}${u.getDisplayInfo()} ${tag}</span>
+                ${isMerc ? '<span class="merc-free">FREE</span>' : `<button class="remove-btn" data-index="${i}">Remove</button>`}
             </div>`;
         }).join('') || '<p style="color:#888; font-style:italic; padding:10px;">No units added yet</p>';
 

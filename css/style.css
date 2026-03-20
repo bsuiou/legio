@@ -1142,6 +1142,29 @@ h2 {
     cursor: default;
 }
 
+.merc-tag {
+    font-size: 9px;
+    font-variant: small-caps;
+    background: rgba(139, 105, 20, 0.15);
+    color: #8b6914;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+.merc-free {
+    font-size: 10px;
+    font-weight: bold;
+    color: #4a7a2a;
+    font-variant: small-caps;
+}
+
+.merc-item {
+    border-left: 3px solid #8b6914;
+    background: rgba(255, 215, 0, 0.04);
+}
+
 .shop-merc-hired {
     font-size: 11px;
     color: #6b5a3a;
