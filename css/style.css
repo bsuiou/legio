@@ -72,7 +72,8 @@ canvas {
 
 /* Hide inner frame on scrollable content to prevent overlap */
 #modifiersScreen .menu-content::before,
-#armySetup .menu-content::before {
+#armySetup .menu-content::before,
+.shop-content::before {
     display: none;
 }
 
@@ -955,6 +956,8 @@ h2 {
 /* --- Denarii Shop --- */
 .shop-content {
     max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .shop-coins {
