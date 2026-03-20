@@ -189,7 +189,8 @@ class Unit {
         const tc = TYPE_CONFIG[this.type];
         const sub = this.subName ? ` ${this.subName}` : '';
         const vet = this.veteran ? '\u2605 ' : '';
-        return `${vet}${tc.label}${sub} ${sc.label} (${Math.round(this.hp)}/${this.maxHp})`;
+        const merc = this._isMercenary ? 'Merc. ' : '';
+        return `${vet}${merc}${tc.label}${sub} ${sc.label} (${Math.round(this.hp)}/${this.maxHp})`;
     }
 
     getCost() {
