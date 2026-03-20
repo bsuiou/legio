@@ -24,10 +24,10 @@ function unitSymbolHTML(type, size, small) {
         shapeHTML = `<rect x="1" y="2" width="${svgW-2}" height="${svgH-4}" fill="${shapeFill}" stroke="${shapeColor}" stroke-width="1.5"/>`;
     }
 
-    // Abstract symbol inside the shape — fit to the shorter dimension
+    // Abstract symbol inside the shape — inset so stroke doesn't overflow
     const cx = svgW / 2, cy = svgH / 2;
-    const innerH = (sc.shape === 'rect') ? svgH - 8 : svgH - 8;
-    const symSize = Math.min(Math.round(14 * s), innerH);
+    const innerH = (sc.shape === 'rect') ? svgH - 12 : svgH - 12;
+    const symSize = Math.min(Math.round(11 * s), innerH);
     let symHTML = '';
     if (tc.symbol === 'x') {
         symHTML = `<line x1="${cx-symSize/2}" y1="${cy-symSize/2}" x2="${cx+symSize/2}" y2="${cy+symSize/2}" stroke="${shapeColor}" stroke-width="${strokeW}" stroke-linecap="round"/>

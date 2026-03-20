@@ -161,11 +161,12 @@ const Renderer = {
         ctx.lineWidth = tc.bold ? 5.5 : 2;
         ctx.lineCap = 'round';
 
-        // Symbol spans corner to corner of the shape
-        const symW = sc.shape === 'circle' ? sc.radius * 0.7 :
-            sc.shape === 'square' ? sc.size / 2 : sc.width / 2;
-        const symH = sc.shape === 'circle' ? sc.radius * 0.7 :
-            sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
+        // Symbol inset from edges so stroke doesn't overflow the shape
+        const inset = tc.bold ? 6 : 4;
+        const symW = sc.shape === 'circle' ? sc.radius * 0.55 :
+            sc.shape === 'square' ? sc.size / 2 - inset : sc.width / 2 - inset;
+        const symH = sc.shape === 'circle' ? sc.radius * 0.55 :
+            sc.shape === 'square' ? sc.size / 2 - inset : sc.height / 2 - inset;
 
         if (tc.symbol === 'x') {
             // Draw X from corner to corner
