@@ -357,6 +357,52 @@ const Renderer = {
         this.ctx.restore();
     },
 
+    drawLineDragPreview(positions, units) {
+        if (!positions || positions.length === 0) return;
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.scale(this.scale, this.scale);
+
+        // Draw the line itself (dashed gold)
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(positions[0].x, positions[0].y);
+        ctx.lineTo(positions[positions.length - 1].x, positions[positions.length - 1].y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw ghost outlines at each position
+        for (let i = 0; i < positions.length; i++) {
+            const pos = positions[i];
+            const unit = units[i];
+            if (!unit) continue;
+
+            const sc = SIZE_CONFIG[unit.size];
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.08)';
+            ctx.lineWidth = 1.5;
+
+            if (sc.shape === 'circle') {
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, sc.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            } else if (sc.shape === 'square') {
+                const hs = sc.size / 2;
+                ctx.fillRect(pos.x - hs, pos.y - hs, sc.size, sc.size);
+                ctx.strokeRect(pos.x - hs, pos.y - hs, sc.size, sc.size);
+            } else {
+                const hw = sc.width / 2, hh = sc.height / 2;
+                ctx.fillRect(pos.x - hw, pos.y - hh, sc.width, sc.height);
+                ctx.strokeRect(pos.x - hw, pos.y - hh, sc.width, sc.height);
+            }
+        }
+
+        ctx.restore();
+    },
+
     drawBattleInfo(playerUnits, enemyUnits) {
         const ctx = this.ctx;
         ctx.save();

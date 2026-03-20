@@ -12,6 +12,11 @@ const Input = {
     _dragOrigX: 0,
     _dragOrigY: 0,
     _attackMoveMode: false,
+    _rightDragging: false,
+    _rightDragStartX: 0,
+    _rightDragStartY: 0,
+    _lineDragPreview: null,
+    _rightDragConsumed: false,
 
     init() {
         const canvas = Renderer.canvas;
@@ -46,6 +51,12 @@ const Input = {
                         }
                     }
                 }
+            } else if (e.button === 2 && !e.shiftKey) {
+                const g = Renderer.screenToGame(e.clientX, e.clientY);
+                this._rightDragStartX = g.x;
+                this._rightDragStartY = g.y;
+                this._rightDragging = false;
+                this._lineDragPreview = null;
             }
         });
 
@@ -78,6 +89,26 @@ const Input = {
                         const zoneW = GameMap.width / 6;
                         this.draggingPlacedUnit.x = Math.max(cr, Math.min(zoneW - cr, g.x));
                         this.draggingPlacedUnit.y = Math.max(cr, Math.min(GameMap.height - cr, g.y));
+                    }
+                }
+            }
+            // Right-button drag detection for line formation
+            if (e.buttons & 2) {
+                const g = Renderer.screenToGame(e.clientX, e.clientY);
+                const dx = g.x - this._rightDragStartX;
+                const dy = g.y - this._rightDragStartY;
+                if (Math.sqrt(dx * dx + dy * dy) > this.dragThreshold) {
+                    this._rightDragging = true;
+                }
+                if (this._rightDragging) {
+                    const selected = Army.playerUnits.filter(u =>
+                        Game.state === 'BATTLE' ? u.alive && u.selected : u.selected);
+                    if (selected.length > 1) {
+                        this._lineDragPreview = this._computeLinePositions(
+                            this._rightDragStartX, this._rightDragStartY,
+                            g.x, g.y, selected);
+                    } else {
+                        this._lineDragPreview = null;
                     }
                 }
             }
@@ -125,6 +156,17 @@ const Input = {
                     }
                 }
                 this.isDragging = false;
+            } else if (e.button === 2) {
+                if (this._rightDragging && this._lineDragPreview && this._lineDragPreview.length > 1) {
+                    const selected = Army.playerUnits.filter(u =>
+                        Game.state === 'BATTLE' ? u.alive && u.selected : u.selected);
+                    if (selected.length > 1) {
+                        this._applyLineDragPositions(selected, this._lineDragPreview);
+                    }
+                    this._rightDragConsumed = true;
+                }
+                this._rightDragging = false;
+                this._lineDragPreview = null;
             }
         });
 
@@ -227,6 +269,10 @@ const Input = {
         // Shift+right-click queues waypoints
         canvas.addEventListener('contextmenu', (e) => {
             e.preventDefault();
+            if (this._rightDragConsumed) {
+                this._rightDragConsumed = false;
+                return;
+            }
             if (Game.state === 'BATTLE') {
                 const g = Renderer.screenToGame(e.clientX, e.clientY);
                 if (e.shiftKey) {
@@ -578,5 +624,49 @@ const Input = {
             x2: this.gameX,
             y2: this.gameY
         };
+    },
+
+    getLineDragPreview() {
+        if (!this._rightDragging || !this._lineDragPreview) return null;
+        return this._lineDragPreview;
+    },
+
+    _computeLinePositions(startX, startY, endX, endY, units) {
+        const n = units.length;
+        if (n === 0) return [];
+        if (n === 1) return [{ x: startX, y: startY }];
+        const positions = [];
+        for (let i = 0; i < n; i++) {
+            const t = i / (n - 1);
+            positions.push({
+                x: startX + (endX - startX) * t,
+                y: startY + (endY - startY) * t
+            });
+        }
+        return positions;
+    },
+
+    _applyLineDragPositions(selected, positions) {
+        if (Game.state === 'BATTLE') {
+            for (let i = 0; i < selected.length; i++) {
+                const u = selected[i];
+                if (u.inCombat) Combat.disengage(u);
+                u.holdGround = false;
+                u.targetQueue = [];
+                u.idleTime = 0;
+                u.targetX = positions[i].x;
+                u.targetY = positions[i].y;
+                u.attackMove = false;
+                u.attackMoveTarget = null;
+            }
+        } else if (Game.state === 'PLACEMENT') {
+            const allPlaced = Army.rosterForPlacement.every(r => r.placed);
+            if (allPlaced) {
+                for (let i = 0; i < selected.length; i++) {
+                    selected[i].targetX = positions[i].x;
+                    selected[i].targetY = positions[i].y;
+                }
+            }
+        }
     }
 };

@@ -1096,6 +1096,12 @@ const Game = {
             }
         }
 
+        // Draw line drag preview
+        if (Input._lineDragPreview) {
+            const sel = Army.playerUnits.filter(u => u.selected);
+            Renderer.drawLineDragPreview(Input._lineDragPreview, sel);
+        }
+
         // AI units hidden during placement — revealed at battle start
     },
 
@@ -1216,6 +1222,12 @@ const Game = {
         const box = Input.getSelectionBox();
         if (box) {
             Renderer.drawSelectionBox(box.x1, box.y1, box.x2, box.y2);
+        }
+
+        // Draw line drag preview
+        if (Input._lineDragPreview) {
+            const sel = Army.playerUnits.filter(u => u.alive && u.selected);
+            Renderer.drawLineDragPreview(Input._lineDragPreview, sel);
         }
 
         // Draw battle info overlay
