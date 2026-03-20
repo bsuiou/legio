@@ -36,6 +36,12 @@ const GameMap = {
         this.bridges = [];
         this.roads = [];
         this._twinRiverData = null;
+        this._pendingHills = [];
+        this._roadMask = null;
+        // Pre-compute hill positions for maps with random hills + roads
+        if (this.mapType === 'grasslands' || this.mapType === 'river') {
+            this._precomputeHillPositions();
+        }
         if (this.mapType === 'roman_road') {
             this._generateRomanRoad();
         }
@@ -58,6 +64,10 @@ const GameMap = {
             this._generateNarrowPassRoad();
         } else if (this.mapType === 'dense_forest') {
             this._generateDenseForestRoad();
+        }
+        // Build road mask for forest tinting exclusion
+        if (this.roads.length > 0) {
+            this._buildRoadMask();
         }
         if (this.mapType === 'hillfort') {
             this._generateHillfortTerrain();
@@ -572,26 +582,15 @@ const GameMap = {
             this.forests.push(this._createFeature(fx, fy, fr, undefined, fx * 0.01 + fy * 0.01 + fr));
         }
 
-        // Generate discrete hills
-
-        // Generate discrete hills for grasslands/river maps
-        const totalHillArea = 4 * Math.PI * 130 * 130;
-        const hillPattern = Math.abs(this._noise(this._seed * 0.13, 0.5));
-        const numHills = hillPattern < 0.3 ? 2 : hillPattern < 0.6 ? 3 : 4;
-        const hillRadii = this._splitAreaBudget(totalHillArea, numHills, this._seed * 0.17);
-
+        // Generate discrete hills — use pre-computed positions if available
         this.hills = [];
+        const pendingHills = this._pendingHills || [];
+        const numHills = pendingHills.length;
+
         for (let i = 0; i < numHills; i++) {
-            const onLeft = (i % 2 === 0);
-            const halfMin = onLeft ? 200 : this.width * 0.5;
-            const halfMax = onLeft ? this.width * 0.5 : this.width - 200;
-            const hr = clampR(hillRadii[i], 70, 200);
-            let hx, hy, attempts = 0;
-            do {
-                hx = halfMin + (this._noise(i * 7.1 + attempts * 0.7, this._seed * 0.05) + 1) * 0.5 * (halfMax - halfMin);
-                hy = 150 + (this._noise(this._seed * 0.05, i * 7.1 + attempts * 0.7) + 1) * 0.5 * (this.height - 300);
-                attempts++;
-            } while (this._isNearRiver(hx, hy, hr + 40) && attempts < 10);
+            const ph = pendingHills[i];
+            const hr = ph.radius;
+            let hx = ph.x, hy = ph.y;
             const elev = 0.32 + Math.abs(this._noise(i * 1.9, i * 3.1)) * 0.20;
 
             // Push away from forests
@@ -1000,10 +999,11 @@ const GameMap = {
     },
 
     // Check if a unit is on a road (center within road width = ≥50% overlap)
-    isOnRoad(px, py) {
+    isOnRoad(px, py, margin) {
+        margin = margin || 0;
         for (const road of this.roads) {
             const pts = road.points;
-            const hw = road.width / 2;
+            const hw = road.width / 2 + margin;
             for (let i = 0; i < pts.length - 1; i++) {
                 const ax = pts[i].x, ay = pts[i].y;
                 const bx = pts[i + 1].x, by = pts[i + 1].y;
@@ -1044,9 +1044,10 @@ const GameMap = {
                 let g = baseG * shade + texNoise - 5;
                 let b = baseB * shade + texNoise - 10;
 
-                // Forest zone tinting — smooth distance-based falloff with noise variation
+                // Forest zone tinting — skip on roads, smooth distance-based falloff
                 let forestInf = 0;
-                for (const ff of this.forests) {
+                const onRoad = this._roadMask && this._roadMask[gy * this._cols + gx];
+                if (!onRoad) for (const ff of this.forests) {
                     const fdx = x - ff.x, fdy = y - ff.y;
                     const distSq = fdx * fdx + fdy * fdy;
                     const rSq = ff.radius * ff.radius;
@@ -1292,19 +1293,29 @@ const GameMap = {
             ctx.strokeStyle = 'rgba(50, 70, 30, 0.18)';
             ctx.lineWidth = 1.5;
             ctx.setLineDash([6, 4]);
-            ctx.beginPath();
-            // Start at midpoint between last and first point
-            const startX = (boundaryPts[0].x + boundaryPts[boundaryPts.length - 1].x) / 2;
-            const startY = (boundaryPts[0].y + boundaryPts[boundaryPts.length - 1].y) / 2;
-            ctx.moveTo(startX, startY);
+            const hasRoads = this.roads.length > 0;
+            // Draw boundary in segments, skipping where road crosses
+            let inPath = false;
             for (let i = 0; i < boundaryPts.length; i++) {
                 const next = boundaryPts[(i + 1) % boundaryPts.length];
                 const midX = (boundaryPts[i].x + next.x) / 2;
                 const midY = (boundaryPts[i].y + next.y) / 2;
+                const segOnRoad = hasRoads && this.isOnRoad(midX, midY, 20);
+                if (segOnRoad) {
+                    if (inPath) { ctx.stroke(); inPath = false; }
+                    continue;
+                }
+                if (!inPath) {
+                    ctx.beginPath();
+                    const prevIdx = (i - 1 + boundaryPts.length) % boundaryPts.length;
+                    const prevMidX = (boundaryPts[prevIdx].x + boundaryPts[i].x) / 2;
+                    const prevMidY = (boundaryPts[prevIdx].y + boundaryPts[i].y) / 2;
+                    ctx.moveTo(prevMidX, prevMidY);
+                    inPath = true;
+                }
                 ctx.quadraticCurveTo(boundaryPts[i].x, boundaryPts[i].y, midX, midY);
             }
-            ctx.closePath();
-            ctx.stroke();
+            if (inPath) ctx.stroke();
             ctx.setLineDash([]);
 
             // --- Generate tree data with type, size, alpha ---
@@ -1333,10 +1344,7 @@ const GameMap = {
                     if (distRatio > 1.15) continue;
                 }
 
-                // Interior clearings — skip trees in low-frequency noise pockets
-                if (this._noise(tx * 0.025, ty * 0.025) > 0.42) continue;
-
-                // Determine tree type and size
+                // Determine tree type and size (needed before road check for margin)
                 const typeNoise = Math.abs(this._noise(i * 3.1, f.x * 0.02));
                 let type, treeSize;
                 if (typeNoise < 0.45) {
@@ -1349,6 +1357,12 @@ const GameMap = {
                     type = 2; // bush
                     treeSize = 6 + Math.abs(this._noise(i * 1.7, i * 2.9)) * 5;
                 }
+
+                // Skip trees on roads (roads split forests) — margin accounts for tree canopy size
+                if (this.roads.length > 0 && this.isOnRoad(tx, ty, 12 + treeSize * 0.6)) continue;
+
+                // Interior clearings — skip trees in low-frequency noise pockets
+                if (this._noise(tx * 0.025, ty * 0.025) > 0.42) continue;
 
                 // Alpha based on distance from center — denser in the middle
                 const dx2 = tx - f.x, dy2 = ty - f.y;
@@ -1991,6 +2005,66 @@ const GameMap = {
         return bypass;
     },
 
+    // --- Road Mask (for forest tinting exclusion) ---
+
+    _buildRoadMask() {
+        const cols = this._cols, rows = this._rows, gs = this.gridSize;
+        this._roadMask = new Uint8Array(cols * rows);
+        for (const road of this.roads) {
+            const pts = road.points;
+            const hw = road.width / 2 + 20; // margin beyond road edge for clean forest gap
+            for (let i = 0; i < pts.length - 1; i++) {
+                const ax = pts[i].x, ay = pts[i].y;
+                const bx = pts[i + 1].x, by = pts[i + 1].y;
+                // Bounding box of this segment in grid coords
+                const gxMin = Math.max(0, Math.floor((Math.min(ax, bx) - hw) / gs));
+                const gxMax = Math.min(cols - 1, Math.ceil((Math.max(ax, bx) + hw) / gs));
+                const gyMin = Math.max(0, Math.floor((Math.min(ay, by) - hw) / gs));
+                const gyMax = Math.min(rows - 1, Math.ceil((Math.max(ay, by) + hw) / gs));
+                const dx = bx - ax, dy = by - ay;
+                const lenSq = dx * dx + dy * dy;
+                for (let gy = gyMin; gy <= gyMax; gy++) {
+                    for (let gx = gxMin; gx <= gxMax; gx++) {
+                        if (this._roadMask[gy * cols + gx]) continue;
+                        const px = gx * gs, py = gy * gs;
+                        const t = lenSq > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq)) : 0;
+                        const cx = ax + t * dx, cy = ay + t * dy;
+                        if ((px - cx) * (px - cx) + (py - cy) * (py - cy) < hw * hw) {
+                            this._roadMask[gy * cols + gx] = 1;
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    // --- Pre-compute hill positions for road avoidance ---
+
+    _precomputeHillPositions() {
+        // Compute hill center positions and radii before roads are generated
+        // so roads can steer around them. Only for maps with random hill placement.
+        this._pendingHills = [];
+        const totalHillArea = 4 * Math.PI * 130 * 130;
+        const hillPattern = Math.abs(this._noise(this._seed * 0.13, 0.5));
+        const numHills = hillPattern < 0.3 ? 2 : hillPattern < 0.6 ? 3 : 4;
+        const hillRadii = this._splitAreaBudget(totalHillArea, numHills, this._seed * 0.17);
+        const clampR = (r, min, max) => Math.max(min, Math.min(max, r));
+
+        for (let i = 0; i < numHills; i++) {
+            const onLeft = (i % 2 === 0);
+            const halfMin = onLeft ? 200 : this.width * 0.5;
+            const halfMax = onLeft ? this.width * 0.5 : this.width - 200;
+            const hr = clampR(hillRadii[i], 70, 200);
+            let hx, hy, attempts = 0;
+            do {
+                hx = halfMin + (this._noise(i * 7.1 + attempts * 0.7, this._seed * 0.05) + 1) * 0.5 * (halfMax - halfMin);
+                hy = 150 + (this._noise(this._seed * 0.05, i * 7.1 + attempts * 0.7) + 1) * 0.5 * (this.height - 300);
+                attempts++;
+            } while (this._isNearRiver(hx, hy, hr + 40) && attempts < 10);
+            this._pendingHills.push({ x: hx, y: hy, radius: hr, index: i });
+        }
+    },
+
     // --- Roman Road ---
 
     _generateRomanRoad() {
@@ -2028,6 +2102,15 @@ const GameMap = {
             const targetY = startY + (endY - startY) * progress;
             const drift = this._noise(rx * 0.003 + this._seed * 0.15, ry * 0.004) * 3;
             ry = targetY + drift;
+            // Steer around pre-computed hills
+            for (const ph of this._pendingHills) {
+                const dx = rx - ph.x, dy = ry - ph.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const avoidR = ph.radius + roadWidth;
+                if (dist < avoidR && dist > 1) {
+                    ry += (dy / dist) * (avoidR - dist) * 0.35;
+                }
+            }
             ry = Math.max(40, Math.min(this.height - 40, ry));
             points.push({ x: rx, y: ry });
         }
@@ -2054,6 +2137,15 @@ const GameMap = {
             const targetY = ry + (bridge.y - ry) * bridgeInfluence * 0.15;
             const drift = this._noise(rx * 0.003 + this._seed * 0.25, targetY * 0.004) * 3;
             ry = targetY + drift;
+            // Steer around pre-computed hills
+            for (const ph of this._pendingHills) {
+                const dx = rx - ph.x, dy = ry - ph.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const avoidR = ph.radius + roadWidth;
+                if (dist < avoidR && dist > 1) {
+                    ry += (dy / dist) * (avoidR - dist) * 0.35;
+                }
+            }
             ry = Math.max(40, Math.min(this.height - 40, ry));
             points.push({ x: rx, y: ry });
         }
