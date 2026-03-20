@@ -145,18 +145,20 @@ class Unit {
         // Slope penalty — steeper hills slow units more
         const slope = GameMap.getSlope(this.x, this.y);
         speed *= Math.max(0.4, 1.0 - slope * 18);
-        // Forest penalty - proportional to how much of the unit is in the forest
-        const forestOverlap = GameMap.getForestOverlap(this.x, this.y, this.getCollisionRadius());
-        if (forestOverlap > 0) {
-            if (this.category === 'cavalry') {
-                speed *= 1.0 - forestOverlap * 0.85; // up to 85% slower at full overlap
-            } else {
-                speed *= 1.0 - forestOverlap * 0.55; // up to 55% slower at full overlap
+        // Road check — roads negate forest penalties and grant a speed bonus
+        const onRoad = GameMap.roads.length > 0 && GameMap.isOnRoad(this.x, this.y);
+        if (onRoad) {
+            speed *= 1.25; // Roman road bonus
+        } else {
+            // Forest penalty - only applies off-road
+            const forestOverlap = GameMap.getForestOverlap(this.x, this.y, this.getCollisionRadius());
+            if (forestOverlap > 0) {
+                if (this.category === 'cavalry') {
+                    speed *= 1.0 - forestOverlap * 0.85; // up to 85% slower at full overlap
+                } else {
+                    speed *= 1.0 - forestOverlap * 0.55; // up to 55% slower at full overlap
+                }
             }
-        }
-        // Roman road bonus: 25% faster when unit center is on road
-        if (GameMap.roads.length > 0 && GameMap.isOnRoad(this.x, this.y)) {
-            speed *= 1.25;
         }
         return speed;
     }

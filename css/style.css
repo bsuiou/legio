@@ -313,10 +313,11 @@ h2 {
 #battleUI {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     color: #e8d5b5;
     font-size: 14px;
     padding: 8px 16px;
-    gap: 8px;
+    gap: 6px 8px;
 }
 
 #battleUI.hidden {
@@ -324,17 +325,18 @@ h2 {
 }
 
 .unit-info-panel {
-    min-width: 180px;
+    min-width: 120px;
     font-size: 13px;
-    flex-shrink: 0;
+    flex-shrink: 1;
     opacity: 0.85;
 }
 
 /* Shared battle button base */
 .battle-controls {
     display: flex;
-    gap: 6px;
-    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    flex-shrink: 1;
     align-items: center;
 }
 

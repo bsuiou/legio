@@ -538,6 +538,11 @@ const Game = {
             <button id="btnSpeed" class="speed-btn" onclick="Game.cycleSpeed()" title="Game Speed">${this._speedLabels[this._speedSteps.indexOf(this.gameSpeed)]}</button>
         `;
 
+        // Stop canvas from stealing clicks on any battle button
+        document.querySelectorAll('.battle-controls button, .speed-btn').forEach(btn => {
+            btn.addEventListener('mousedown', (e) => e.stopPropagation());
+        });
+
         // Retreat button
         document.getElementById('btnRetreat').addEventListener('click', () => {
             Input._handleRetreat();
@@ -569,12 +574,8 @@ const Game = {
             Input._handleRally();
         });
 
-        // Dig Ditch button — stopPropagation so canvas doesn't steal the click
-        document.getElementById('btnDig').addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-        });
-        document.getElementById('btnDig').addEventListener('click', (e) => {
-            e.stopPropagation();
+        // Dig Ditch button
+        document.getElementById('btnDig').addEventListener('click', () => {
             Input._handleDigToggle();
         });
 
