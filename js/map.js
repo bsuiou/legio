@@ -1046,6 +1046,7 @@ const GameMap = {
 
                 // Forest zone tinting — skip on roads, smooth distance-based falloff
                 let forestInf = 0;
+                const gx = Math.floor(x / this.gridSize), gy = Math.floor(y / this.gridSize);
                 const onRoad = this._roadMask && this._roadMask[gy * this._cols + gx];
                 if (!onRoad) for (const ff of this.forests) {
                     const fdx = x - ff.x, fdy = y - ff.y;
