@@ -276,6 +276,12 @@ const Game = {
             GameMap.ditches = [];
             GameMap.roads = [];
             GameMap._twinRiverData = null;
+            GameMap._pendingHills = [];
+            GameMap._roadMask = null;
+            // Pre-compute hill positions for maps that need it
+            if (m.type === 'grasslands' || m.type === 'river') {
+                GameMap._precomputeHillPositions();
+            }
             if (m.type === 'roman_road') {
                 GameMap._generateRomanRoad();
             }
@@ -297,6 +303,10 @@ const Game = {
                 GameMap._generateNarrowPassRoad();
             } else if (m.type === 'dense_forest') {
                 GameMap._generateDenseForestRoad();
+            }
+            // Build road mask for forest tinting exclusion
+            if (GameMap.roads.length > 0) {
+                GameMap._buildRoadMask();
             }
             if (m.type === 'hillfort') {
                 GameMap._generateHillfortTerrain();
