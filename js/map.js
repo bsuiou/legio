@@ -2101,15 +2101,19 @@ const GameMap = {
             rx += 15;
             const progress = rx / this.width;
             const targetY = startY + (endY - startY) * progress;
+            // Gently pull toward the ideal line but keep current deflection
+            ry += (targetY - ry) * 0.08;
             const drift = this._noise(rx * 0.003 + this._seed * 0.15, ry * 0.004) * 3;
-            ry = targetY + drift;
-            // Steer around pre-computed hills
-            for (const ph of this._pendingHills) {
-                const dx = rx - ph.x, dy = ry - ph.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                const avoidR = ph.radius + roadWidth;
-                if (dist < avoidR && dist > 1) {
-                    ry += (dy / dist) * (avoidR - dist) * 0.35;
+            ry += drift;
+            // Steer around pre-computed hills (multiple passes for convergence)
+            for (let pass = 0; pass < 3; pass++) {
+                for (const ph of this._pendingHills) {
+                    const dx = rx - ph.x, dy = ry - ph.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const avoidR = ph.radius + roadWidth + 20;
+                    if (dist < avoidR && dist > 1) {
+                        ry += (dy / dist) * (avoidR - dist) * 0.8;
+                    }
                 }
             }
             ry = Math.max(40, Math.min(this.height - 40, ry));
@@ -2135,16 +2139,18 @@ const GameMap = {
             const progress = rx / this.width;
             // Gently curve toward bridge in the middle, then away
             const bridgeInfluence = Math.max(0, 1 - Math.abs(progress - 0.5) * 4);
-            const targetY = ry + (bridge.y - ry) * bridgeInfluence * 0.15;
-            const drift = this._noise(rx * 0.003 + this._seed * 0.25, targetY * 0.004) * 3;
-            ry = targetY + drift;
-            // Steer around pre-computed hills
-            for (const ph of this._pendingHills) {
-                const dx = rx - ph.x, dy = ry - ph.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                const avoidR = ph.radius + roadWidth;
-                if (dist < avoidR && dist > 1) {
-                    ry += (dy / dist) * (avoidR - dist) * 0.35;
+            ry += (bridge.y - ry) * bridgeInfluence * 0.15;
+            const drift = this._noise(rx * 0.003 + this._seed * 0.25, ry * 0.004) * 3;
+            ry += drift;
+            // Steer around pre-computed hills (multiple passes for convergence)
+            for (let pass = 0; pass < 3; pass++) {
+                for (const ph of this._pendingHills) {
+                    const dx = rx - ph.x, dy = ry - ph.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const avoidR = ph.radius + roadWidth + 20;
+                    if (dist < avoidR && dist > 1) {
+                        ry += (dy / dist) * (avoidR - dist) * 0.8;
+                    }
                 }
             }
             ry = Math.max(40, Math.min(this.height - 40, ry));

@@ -796,7 +796,7 @@ const Campaign = {
     onBattleResult(victory) {
         if (victory) {
             // Earnings: base 100 + 20% per battle number + 0.05 per surviving strength
-            const battleNum = this.getCompletedBattleCount() + 1;
+            const battleNum = this.getCompletedBattleCount();
             const basePay = Math.round(100 * (1 + 0.20 * battleNum));
             const aliveStrength = Army.playerUnits
                 .filter(u => u.alive)

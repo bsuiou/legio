@@ -450,7 +450,6 @@ const Game = {
             if (confirm('Exit this battle?')) {
                 if (Campaign.active) {
                     Game.setState('RESULT');
-                    Game._showResult();
                 } else {
                     Game.setState('MENU');
                 }
@@ -940,7 +939,7 @@ const Game = {
             case 'BATTLE':
                 // Fixed timestep physics — accumulate frame time scaled by game speed
                 this._physicsAccum += frameDt * this.gameSpeed;
-                while (this._physicsAccum >= this._PHYSICS_DT) {
+                while (this._physicsAccum >= this._PHYSICS_DT && this.state === 'BATTLE') {
                     this._updateBattle(this._PHYSICS_DT);
                     this._physicsAccum -= this._PHYSICS_DT;
                 }
