@@ -1365,7 +1365,7 @@ const GameMap = {
 
             // --- Generate tree data with type, size, alpha ---
             // Use jittered grid for even distribution instead of pure noise (which clumps)
-            const spacing = 18; // base grid spacing between trees
+            const spacing = 14; // base grid spacing between trees
             const trees = [];
             const gridLeft = f.x - f.radius * 1.1;
             const gridTop = f.y - f.radius * 1.1;
@@ -1401,15 +1401,16 @@ const GameMap = {
                 // Determine tree type and size (needed before road check for margin)
                 const typeNoise = Math.abs(this._noise(i * 3.1, f.x * 0.02));
                 let type, treeSize;
+                const sizeNoise = Math.abs(this._noise(i * 1.7, i * 2.9));
                 if (typeNoise < 0.45) {
                     type = 0; // deciduous
-                    treeSize = 10 + Math.abs(this._noise(i * 1.7, i * 2.9)) * 8;
+                    treeSize = 6 + sizeNoise * 14; // 6-20px range
                 } else if (typeNoise < 0.80) {
                     type = 1; // conifer
-                    treeSize = 9 + Math.abs(this._noise(i * 1.7, i * 2.9)) * 10;
+                    treeSize = 5 + sizeNoise * 16; // 5-21px range
                 } else {
                     type = 2; // bush
-                    treeSize = 6 + Math.abs(this._noise(i * 1.7, i * 2.9)) * 5;
+                    treeSize = 4 + sizeNoise * 8; // 4-12px range
                 }
 
                 // Skip trees on roads (roads split forests) — margin accounts for tree canopy size
