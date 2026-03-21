@@ -1456,7 +1456,7 @@ const GameMap = {
             ctx.moveTo(x, y + size * 0.3);
             ctx.lineTo(x, y - size * 0.1);
             ctx.strokeStyle = `rgba(80, 60, 30, ${(alpha * 0.9).toFixed(2)})`;
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = Math.max(2, size * 0.15);
             ctx.stroke();
 
             const fill = `rgba(50, 75, 35, ${alpha.toFixed(2)})`;
@@ -1484,7 +1484,7 @@ const GameMap = {
             ctx.moveTo(x, y + size * 0.4);
             ctx.lineTo(x, y - size * 0.1);
             ctx.strokeStyle = `rgba(80, 60, 30, ${(alpha * 0.8).toFixed(2)})`;
-            ctx.lineWidth = 1;
+            ctx.lineWidth = Math.max(1.5, size * 0.12);
             ctx.stroke();
 
             const fill = `rgba(40, 70, 30, ${alpha.toFixed(2)})`;
