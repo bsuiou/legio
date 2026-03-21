@@ -145,8 +145,9 @@ class Unit {
         // Slope penalty — steeper hills slow units more
         const slope = GameMap.getSlope(this.x, this.y);
         speed *= Math.max(0.4, 1.0 - slope * 18);
-        // Road check — roads negate forest penalties and grant a speed bonus
-        const onRoad = GameMap.roads.length > 0 && GameMap.isOnRoad(this.x, this.y);
+        // Road check — even partially touching a road gives full bonus and negates forest
+        const cr = this.getCollisionRadius();
+        const onRoad = GameMap.roads.length > 0 && GameMap.isOnRoad(this.x, this.y, cr * 0.8);
         if (onRoad) {
             speed *= 1.25; // Roman road bonus
         } else {
@@ -381,6 +382,48 @@ class Unit {
                         const side = (perpX * toTargetX + perpY * toTargetY) > 0 ? 1 : -1;
                         moveX += perpX * side * avoidStrength;
                         moveY += perpY * side * avoidStrength;
+                    }
+                }
+
+                // Road preference: gently steer toward nearby roads when not already on one
+                // Only if the road is roughly along our path (not a big detour)
+                if (!this.inCombat && !this.routing && this.targetX !== null && GameMap.roads.length > 0) {
+                    const unitCr = this.getCollisionRadius();
+                    if (!GameMap.isOnRoad(this.x, this.y, unitCr * 0.8)) {
+                        // Find closest road point
+                        let bestRoadX = 0, bestRoadY = 0, bestRoadDist = 150; // max seek range
+                        for (const road of GameMap.roads) {
+                            // Sample every 5th point for performance
+                            for (let ri = 0; ri < road.points.length; ri += 5) {
+                                const rp = road.points[ri];
+                                const rdx = rp.x - this.x, rdy = rp.y - this.y;
+                                const rd = Math.sqrt(rdx * rdx + rdy * rdy);
+                                if (rd < bestRoadDist) {
+                                    // Only prefer if road point is roughly between us and target (not behind us)
+                                    const toTargetDx = this.targetX - this.x;
+                                    const toTargetDy = this.targetY - this.y;
+                                    const toTargetDist = Math.sqrt(toTargetDx * toTargetDx + toTargetDy * toTargetDy);
+                                    if (toTargetDist < 100) break; // close to target, don't detour
+                                    // Road point should not be further from target than we are
+                                    const rpToTarget = Math.sqrt((rp.x - this.targetX) ** 2 + (rp.y - this.targetY) ** 2);
+                                    if (rpToTarget < toTargetDist * 1.1) { // allow 10% detour
+                                        bestRoadDist = rd;
+                                        bestRoadX = rp.x;
+                                        bestRoadY = rp.y;
+                                    }
+                                }
+                            }
+                        }
+                        if (bestRoadDist < 150) {
+                            // Gentle pull toward road — stronger when closer
+                            const pullStrength = (1.0 - bestRoadDist / 150) * 0.25;
+                            const trdx = bestRoadX - this.x, trdy = bestRoadY - this.y;
+                            const trd = Math.sqrt(trdx * trdx + trdy * trdy);
+                            if (trd > 1) {
+                                moveX += (trdx / trd) * speed * dt * pullStrength;
+                                moveY += (trdy / trd) * speed * dt * pullStrength;
+                            }
+                        }
                     }
                 }
 
