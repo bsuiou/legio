@@ -33,6 +33,7 @@ const Game = {
         document.getElementById('campaignMap').classList.add('hidden');
         document.getElementById('spectatorSetup').classList.add('hidden');
         document.getElementById('multiplayerLobby').classList.add('hidden');
+        document.getElementById('endlessMap').classList.add('hidden');
 
         this.state = newState;
 
@@ -67,6 +68,18 @@ const Game = {
                 document.getElementById('campaignMap').classList.remove('hidden');
                 break;
 
+            case 'ENDLESS_MAP':
+                EndlessCampaign.renderMapScreen();
+                document.getElementById('endlessMap').classList.remove('hidden');
+                break;
+
+            case 'ENDLESS_SHOP':
+                EndlessCampaign._resetBattleBuffs();
+                Campaign._battleBuffs = EndlessCampaign._battleBuffs;
+                EndlessCampaign.renderShopScreen();
+                document.getElementById('endlessMap').classList.remove('hidden');
+                break;
+
             case 'MP_LOBBY':
                 this._renderMPLobby();
                 document.getElementById('multiplayerLobby').classList.remove('hidden');
@@ -79,7 +92,9 @@ const Game = {
 
             case 'ARMY_SETUP':
                 GameMap.init(this.selectedMap, this._mpSeed);
-                if (Campaign.active) {
+                if (EndlessCampaign.active) {
+                    EndlessCampaign.renderCampaignSetupUI();
+                } else if (Campaign.active) {
                     Campaign.renderCampaignSetupUI();
                 } else {
                     Army.reset();
@@ -98,7 +113,13 @@ const Game = {
                     Army.playerUnits.forEach((u, i) => { u.netId = prefix + i; });
                 } else {
                     // Generate and place AI army
-                    if (Campaign.active) {
+                    if (EndlessCampaign.active) {
+                        const node = EndlessCampaign._currentNodeData;
+                        AI.budget = node ? node.aBudget : 3000;
+                        for (const u of Army.playerUnits) {
+                            if (u._veteranId) EndlessCampaign._applyVetUpgrades(u);
+                        }
+                    } else if (Campaign.active) {
                         const node = Campaign._currentNodeData || Campaign.getCurrentNode();
                         AI.budget = node ? node.aBudget : 3000;
                         Campaign._deployMercenaries();
@@ -116,6 +137,7 @@ const Game = {
             case 'BATTLE':
                 document.getElementById('battleUI').classList.remove('hidden');
                 if (Campaign.active) Campaign._battleResultProcessed = false;
+                if (EndlessCampaign.active) EndlessCampaign._battleResultProcessed = false;
                 this._assignSubNames();
                 this.battleTime = 0;
                 this.gameSpeed = 1;
@@ -163,6 +185,10 @@ const Game = {
 
         document.getElementById('btnCampaign').addEventListener('click', () => {
             Campaign.start();
+        });
+
+        document.getElementById('btnEndless').addEventListener('click', () => {
+            EndlessCampaign.start();
         });
 
         document.getElementById('btnMultiplayer').addEventListener('click', () => {
@@ -232,7 +258,14 @@ const Game = {
         const container = document.getElementById('resultScreen');
         container.classList.remove('hidden');
 
-        // Campaign mode: delegate to Campaign module
+        // Endless Campaign mode
+        if (EndlessCampaign.active) {
+            EndlessCampaign.onBattleResult(victory);
+            EndlessCampaign.renderResultScreen(container, victory);
+            return;
+        }
+
+        // Story Campaign mode
         if (Campaign.active) {
             Campaign.onBattleResult(victory);
             Campaign.renderResultScreen(container, victory);

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Legio</title>
-    <link rel="stylesheet" href="css/style.css?v=17">
+    <link rel="stylesheet" href="css/style.css?v=18">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -19,6 +19,7 @@
             <button id="btnStart" class="menu-btn">Start Game</button>
             <button id="btnWatch" class="menu-btn">Watch Battle</button>
             <button id="btnCampaign" class="menu-btn">Campaign</button>
+            <button id="btnEndless" class="menu-btn">Endless Campaign</button>
             <button id="btnMultiplayer" class="menu-btn">1v1 Multiplayer</button>
             <button id="btnModifiers" class="menu-btn small">Battle Modifiers</button>
         </div>
@@ -83,6 +84,7 @@
     <div id="battleUI" class="overlay-bar hidden"></div>
     <div id="resultScreen" class="overlay hidden"></div>
     <div id="campaignMap" class="overlay hidden"></div>
+    <div id="endlessMap" class="overlay hidden"></div>
     <div id="spectatorSetup" class="overlay hidden"></div>
     <div id="multiplayerLobby" class="overlay hidden"></div>
 
@@ -94,9 +96,10 @@
     <script src="js/ai.js?v=7"></script>
     <script src="js/army.js?v=15"></script>
     <script src="js/campaign.js?v=16"></script>
+    <script src="js/endless.js?v=1"></script>
     <script src="js/renderer.js?v=17"></script>
     <script src="js/network.js?v=3"></script>
     <script src="js/input.js?v=9"></script>
-    <script src="js/main.js?v=23"></script>
+    <script src="js/main.js?v=24"></script>
 </body>
 </html>
