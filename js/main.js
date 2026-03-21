@@ -1451,30 +1451,6 @@ const Game = {
     _updateBattle(dt) {
         this.battleTime += dt;
 
-        if (!this.spectatorMode) {
-            // Update unit info panel
-            const selected = Army.playerUnits.find(u => u.selected && u.alive);
-            const infoPanel = document.getElementById('unitInfoPanel');
-            if (infoPanel) {
-                if (selected) {
-                    infoPanel.textContent = selected.getDisplayInfo() + (selected.inCombat ? ' [IN COMBAT]' : '');
-                } else {
-                    infoPanel.textContent = 'Select a unit for info';
-                }
-            }
-
-            // Update hotbar
-            this._updateHotbar();
-        }
-
-        // Update timer
-        const timerEl = document.getElementById('battleTimer');
-        if (timerEl) {
-            const m = Math.floor(this.battleTime / 60);
-            const s = Math.floor(this.battleTime % 60);
-            timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-        }
-
         // Update all units
         for (const u of Army.playerUnits) u.update(dt);
         for (const u of AI.units) u.update(dt);
@@ -1530,6 +1506,26 @@ const Game = {
     },
 
     _renderBattle(dt) {
+        // DOM updates — once per render frame, not per physics tick
+        if (!this.spectatorMode) {
+            const selected = Army.playerUnits.find(u => u.selected && u.alive);
+            const infoPanel = document.getElementById('unitInfoPanel');
+            if (infoPanel) {
+                if (selected) {
+                    infoPanel.textContent = selected.getDisplayInfo() + (selected.inCombat ? ' [IN COMBAT]' : '');
+                } else {
+                    infoPanel.textContent = 'Select a unit for info';
+                }
+            }
+            this._updateHotbar();
+        }
+        const timerEl = document.getElementById('battleTimer');
+        if (timerEl) {
+            const m = Math.floor(this.battleTime / 60);
+            const s = Math.floor(this.battleTime % 60);
+            timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
         Renderer.drawMap();
 
         // Draw ditches (above map, below units)

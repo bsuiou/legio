@@ -62,7 +62,7 @@ const Army = {
         this.remaining = this.budget;
         this.rosterForPlacement = [];
         this.placementIndex = -1;
-        _unitIdCounter = 0; // Reset unit IDs for clean pairing
+        // Don't reset _unitIdCounter — prevents ghost references from old games
     },
 
     addUnit(unitType, unitSize) {

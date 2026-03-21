@@ -161,7 +161,7 @@ class Unit {
             }
         }
         // Campaign cavalry speed buff
-        if (Campaign.active && this.side === 'player' && this.category === 'cavalry') {
+        if (Campaign.active && this.team === 'player' && this.category === 'cavalry') {
             speed *= Campaign.getCavalrySpeedBuff();
         }
         return speed;
@@ -475,7 +475,7 @@ class Unit {
             amount *= 0.90;
         }
         // Campaign armor upgrades (stackable)
-        if (Campaign.active && this.side === 'player') {
+        if (Campaign.active && this.team === 'player') {
             amount *= Campaign.getArmorBuff(this);
         }
         // Digging penalty: ×2 damage taken

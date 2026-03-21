@@ -199,7 +199,7 @@ const Combat = {
             const effA = this.getCombatEff(unitA);
             const hpA = this.getHpScaling(unitA);
             const vetA = unitA.veteran ? 1.10 : 1.0;
-            const campDmgA = (Campaign.active && unitA.side === 'player') ? Campaign.getDamageBuff(unitA) : 1.0;
+            const campDmgA = (Campaign.active && unitA.team === 'player') ? Campaign.getDamageBuff(unitA) : 1.0;
             const moraleA = this.getMoraleMod(unitA);
             const dpsA = unitA.strength * this.DPS_FACTOR * unitA.damageMod * effA * hpA *
                 this.getTypeBonus(unitA, unitB) * this.getHeightBonus(unitA, unitB) *
@@ -219,7 +219,7 @@ const Combat = {
             const effB = this.getCombatEff(unitB);
             const hpB = this.getHpScaling(unitB);
             const vetB = unitB.veteran ? 1.10 : 1.0;
-            const campDmgB = (Campaign.active && unitB.side === 'player') ? Campaign.getDamageBuff(unitB) : 1.0;
+            const campDmgB = (Campaign.active && unitB.team === 'player') ? Campaign.getDamageBuff(unitB) : 1.0;
             const moraleB = this.getMoraleMod(unitB);
             const dpsB = unitB.strength * this.DPS_FACTOR * unitB.damageMod * effB * hpB *
                 this.getTypeBonus(unitB, unitA) * this.getHeightBonus(unitB, unitA) *
@@ -249,7 +249,7 @@ const Combat = {
         const effArch = this.getCombatEff(archer);
         const hpArch = this.getHpScaling(archer);
         const vetArch = archer.veteran ? 1.10 : 1.0;
-        const campDmgArch = (Campaign.active && archer.side === 'player') ? Campaign.getDamageBuff(archer) : 1.0;
+        const campDmgArch = (Campaign.active && archer.team === 'player') ? Campaign.getDamageBuff(archer) : 1.0;
         const damage = archer.strength * this.DPS_FACTOR * 0.65 * effArch * hpArch *
             archer.damageMod * this.getTypeBonus(archer, target) *
             this.getForestBonus(archer) * this.getForestCover(target) * vetArch * campDmgArch;
