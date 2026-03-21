@@ -671,7 +671,7 @@ const Campaign = {
         if (this.veteranRoster.length > 0) {
             vetsHTML = `
                 <div class="campaign-veterans">
-                    <h3 style="margin-bottom:8px; font-variant:small-caps; color:#8b6914;">\u2605 Veterans</h3>
+                    <h3 style="margin-bottom:8px; font-variant:small-caps; color:#8b6914;">\u2605 Veterans <button id="btnAddAllVets" class="menu-btn small" style="font-size:10px; padding:2px 10px; margin-left:8px; vertical-align:middle;">Add All</button></h3>
                     ${this.veteranRoster.map(v => {
                         const tc = TYPE_CONFIG[v.type];
                         const sc = SIZE_CONFIG[v.size];
@@ -780,6 +780,23 @@ const Campaign = {
                 this._updateCampaignRoster();
             });
         });
+
+        const addAllBtn = document.getElementById('btnAddAllVets');
+        if (addAllBtn) {
+            addAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                for (const v of this.veteranRoster) {
+                    if (v.deployed || v.cost > Army.remaining) continue;
+                    const unit = new Unit(v.type, v.size, 'player');
+                    unit.veteran = true;
+                    unit._veteranId = v.id;
+                    Army.playerUnits.push(unit);
+                    Army.remaining -= v.cost;
+                    v.deployed = true;
+                }
+                this._updateCampaignRoster();
+            });
+        }
 
         container.addEventListener('click', (e) => {
             if (e.target.classList.contains('remove-btn')) {
