@@ -12,6 +12,7 @@ const Input = {
     _dragOrigX: 0,
     _dragOrigY: 0,
     _attackMoveMode: false,
+    _rightDragActive: false, // true only when right-button down without shift
     _rightDragging: false,
     _rightDragStartX: 0,
     _rightDragStartY: 0,
@@ -53,10 +54,13 @@ const Input = {
                 }
             } else if (e.button === 2 && !e.shiftKey) {
                 const g = Renderer.screenToGame(e.clientX, e.clientY);
+                this._rightDragActive = true;
                 this._rightDragStartX = g.x;
                 this._rightDragStartY = g.y;
                 this._rightDragging = false;
                 this._lineDragPreview = null;
+            } else if (e.button === 2 && e.shiftKey) {
+                this._rightDragActive = false;
             }
         });
 
@@ -85,6 +89,11 @@ const Input = {
                             this.draggingPlacedUnit.x = g.x;
                             this.draggingPlacedUnit.y = g.y;
                         }
+                    } else if (Network.isMultiplayer && !Network.isHost) {
+                        const zoneW = GameMap.width / 6;
+                        const zoneStart = GameMap.width - zoneW;
+                        this.draggingPlacedUnit.x = Math.max(zoneStart + cr, Math.min(GameMap.width - cr, g.x));
+                        this.draggingPlacedUnit.y = Math.max(cr, Math.min(GameMap.height - cr, g.y));
                     } else {
                         const zoneW = GameMap.width / 6;
                         this.draggingPlacedUnit.x = Math.max(cr, Math.min(zoneW - cr, g.x));
@@ -92,8 +101,8 @@ const Input = {
                     }
                 }
             }
-            // Right-button drag detection for line formation
-            if (e.buttons & 2) {
+            // Right-button drag detection for line formation (only when not shift-clicking for waypoints)
+            if ((e.buttons & 2) && this._rightDragActive) {
                 const g = Renderer.screenToGame(e.clientX, e.clientY);
                 const dx = g.x - this._rightDragStartX;
                 const dy = g.y - this._rightDragStartY;
@@ -166,6 +175,7 @@ const Input = {
                     this._rightDragConsumed = true;
                 }
                 this._rightDragging = false;
+                this._rightDragActive = false;
                 this._lineDragPreview = null;
             }
         });
@@ -367,9 +377,19 @@ const Input = {
 
     _handleMoveCommand(gx, gy) {
         if (Game.spectatorMode) return;
-        // Allow move commands for alive selected units — including those in combat (disengage)
         const selected = Army.playerUnits.filter(u => u.alive && u.selected);
         if (selected.length === 0) return;
+
+        // Guest: send command to host instead of executing locally
+        if (Network.isMultiplayer && !Network.isHost) {
+            Network.sendCommand({
+                type: 'move',
+                unitIds: selected.map(u => u.netId),
+                x: gx, y: gy,
+                formation: Game.currentFormation
+            });
+            return;
+        }
 
         // Check if right-clicking on an enemy unit
         let targetEnemy = null;
@@ -527,6 +547,16 @@ const Input = {
         const selected = Army.playerUnits.filter(u => u.alive && u.selected);
         if (selected.length === 0) return;
 
+        // Guest: send command to host
+        if (Network.isMultiplayer && !Network.isHost) {
+            Network.sendCommand({
+                type: 'waypoint',
+                unitIds: selected.map(u => u.netId),
+                x: gx, y: gy
+            });
+            return;
+        }
+
         if (selected.length === 1) {
             const u = selected[0];
             if (u.targetX === null) {
@@ -560,7 +590,10 @@ const Input = {
         if (Game.spectatorMode) return;
         const selected = Army.playerUnits.filter(u => u.alive && u.selected && u.size === UnitSize.LEGION);
         if (selected.length === 0) return;
-
+        if (Network.isMultiplayer && !Network.isHost) {
+            Network.sendCommand({ type: 'dig', unitIds: selected.map(u => u.netId) });
+            return;
+        }
         for (const u of selected) {
             if (u.digging) {
                 // Stop digging — nudge past ditch edge
@@ -577,10 +610,13 @@ const Input = {
 
     _handleRetreat() {
         if (Game.spectatorMode) return;
-        // Retreat selected units: disengage and move toward player side (left)
         const selected = Army.playerUnits.filter(u => u.alive && u.selected);
         if (selected.length === 0) return;
-
+        if (Network.isMultiplayer && !Network.isHost) {
+            Network.sendCommand({ type: 'retreat', unitIds: selected.map(u => u.netId) });
+            return;
+        }
+        // Retreat selected units: disengage and move toward player side (left)
         for (const u of selected) {
             if (u.inCombat) {
                 Combat.disengage(u);
@@ -600,7 +636,10 @@ const Input = {
         if (Game.spectatorMode) return;
         const selected = Army.playerUnits.filter(u => u.alive && u.selected && u.canRally());
         if (selected.length === 0) return;
-
+        if (Network.isMultiplayer && !Network.isHost) {
+            Network.sendCommand({ type: 'rally', unitIds: selected.map(u => u.netId) });
+            return;
+        }
         for (const rallier of selected) {
             let rallied = 0;
             for (const u of Army.playerUnits) {

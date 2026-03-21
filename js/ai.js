@@ -444,6 +444,7 @@ const AI = {
 
     // Battle AI - formation-based + terrain awareness + fog of war
     updateBattle(playerUnits, dt) {
+        if (Network.isMultiplayer) return; // human controls enemy side
         // Check if any player units are visible to the AI
         const visibleEnemies = playerUnits.filter(e => e.alive && Visibility.isVisible(e.x, e.y, 'enemy'));
         const hasVisibleTargets = visibleEnemies.length > 0;

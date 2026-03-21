@@ -18,6 +18,9 @@ const Game = {
         this.loop(0);
     },
 
+    // Multiplayer map seed — shared between host and guest
+    _mpSeed: null,
+
     setState(newState) {
         // Hide all overlays
         document.getElementById('mainMenu').classList.add('hidden');
@@ -29,6 +32,7 @@ const Game = {
         document.getElementById('modifiersScreen').classList.add('hidden');
         document.getElementById('campaignMap').classList.add('hidden');
         document.getElementById('spectatorSetup').classList.add('hidden');
+        document.getElementById('multiplayerLobby').classList.add('hidden');
 
         this.state = newState;
 
@@ -63,8 +67,18 @@ const Game = {
                 document.getElementById('campaignMap').classList.remove('hidden');
                 break;
 
+            case 'MP_LOBBY':
+                this._renderMPLobby();
+                document.getElementById('multiplayerLobby').classList.remove('hidden');
+                break;
+
+            case 'MP_WAITING':
+                this._renderMPWaiting();
+                document.getElementById('multiplayerLobby').classList.remove('hidden');
+                break;
+
             case 'ARMY_SETUP':
-                GameMap.init(this.selectedMap);
+                GameMap.init(this.selectedMap, this._mpSeed);
                 if (Campaign.active) {
                     Campaign.renderCampaignSetupUI();
                 } else {
@@ -77,21 +91,26 @@ const Game = {
             case 'PLACEMENT':
                 Army.renderPlacementUI();
                 document.getElementById('placementUI').classList.remove('hidden');
-                // Generate and place AI army
-                if (Campaign.active) {
-                    const node = Campaign._currentNodeData || Campaign.getCurrentNode();
-                    AI.budget = node ? node.aBudget : 3000;
-                    // Deploy mercenaries (free units from shop)
-                    Campaign._deployMercenaries();
-                    // Apply veteran upgrades to deployed units
-                    for (const u of Army.playerUnits) {
-                        if (u._veteranId) Campaign._applyVetUpgrades(u);
-                    }
+                // In multiplayer, don't generate AI army — opponent handles their side
+                if (Network.isMultiplayer) {
+                    // Assign netIds to player units
+                    const prefix = Network.isHost ? 'h' : 'g';
+                    Army.playerUnits.forEach((u, i) => { u.netId = prefix + i; });
                 } else {
-                    AI.budget = Army.budget;
+                    // Generate and place AI army
+                    if (Campaign.active) {
+                        const node = Campaign._currentNodeData || Campaign.getCurrentNode();
+                        AI.budget = node ? node.aBudget : 3000;
+                        Campaign._deployMercenaries();
+                        for (const u of Army.playerUnits) {
+                            if (u._veteranId) Campaign._applyVetUpgrades(u);
+                        }
+                    } else {
+                        AI.budget = Army.budget;
+                    }
+                    AI.generateArmy();
+                    AI.placeUnits();
                 }
-                AI.generateArmy();
-                AI.placeUnits();
                 break;
 
             case 'BATTLE':
@@ -110,11 +129,15 @@ const Game = {
                 this._battleEvents = { playerRouted: 0, playerDestroyed: 0, enemyRouted: 0, enemyDestroyed: 0 };
                 // Init fog of war
                 Visibility.init();
-                AI.initScouts();
+                if (!Network.isMultiplayer) AI.initScouts();
                 // Snapshot alive state for death detection
                 this._prevAlive = {};
                 for (const u of Army.playerUnits) this._prevAlive[u.id] = true;
                 for (const u of AI.units) this._prevAlive[u.id] = true;
+                // Start multiplayer broadcasting
+                if (Network.isMultiplayer && Network.isHost) {
+                    this._setupHostBroadcast();
+                }
                 break;
 
             case 'RESULT':
@@ -142,6 +165,10 @@ const Game = {
             Campaign.start();
         });
 
+        document.getElementById('btnMultiplayer').addEventListener('click', () => {
+            this.setState('MP_LOBBY');
+        });
+
         document.getElementById('btnBack').addEventListener('click', () => {
             this.setState('MENU');
         });
@@ -152,9 +179,15 @@ const Game = {
                 document.querySelectorAll('.map-card').forEach(c => c.classList.remove('selected'));
                 e.currentTarget.classList.add('selected');
                 this.selectedMap = e.currentTarget.dataset.map;
-                if (this.spectatorMode) {
+                if (Network.isMultiplayer) {
+                    // Host selects map — broadcast to guest
+                    this._mpSeed = Math.floor(Math.random() * 100000);
+                    Network.sendMapSelection(this.selectedMap, this._mpSeed, Army.budget);
+                    this.setState('ARMY_SETUP');
+                } else if (this.spectatorMode) {
                     this.setState('SPECTATOR_SETUP');
                 } else {
+                    this._mpSeed = null;
                     this.setState('ARMY_SETUP');
                 }
             });
@@ -177,6 +210,14 @@ const Game = {
         const playerAlive = Army.playerUnits.filter(u => u.alive);
         const enemyAlive = AI.units.filter(u => u.alive);
         const victory = enemyAlive.length === 0;
+
+        // Multiplayer: stop broadcasting, notify peer
+        if (Network.isMultiplayer) {
+            Network.stopBroadcasting();
+            if (Network.isHost) {
+                Network.sendBattleResult(victory ? 'host' : 'guest');
+            }
+        }
 
         const container = document.getElementById('resultScreen');
         container.classList.remove('hidden');
@@ -233,7 +274,7 @@ const Game = {
                     ${ev.playerDestroyed > 0 ? `<div>${ev.playerDestroyed} of your unit${ev.playerDestroyed > 1 ? 's' : ''} fell</div>` : ''}
                     ${ev.playerRouted > 0 ? `<div>${ev.playerRouted} of your unit${ev.playerRouted > 1 ? 's' : ''} broke and fled</div>` : ''}
                 </div>
-                <button class="menu-btn" onclick="Game.setState('MENU')">Return to Menu</button>
+                <button class="menu-btn" onclick="if(Network.isMultiplayer) Network.leaveRoom(); Game.setState('MENU')">Return to Menu</button>
             </div>
         `;
     },
@@ -337,6 +378,333 @@ const Game = {
         `;
     },
 
+    // --- Multiplayer UI & Logic ---
+
+    _renderMPLobby() {
+        const container = document.getElementById('multiplayerLobby');
+        container.innerHTML = `
+            <div class="menu-content">
+                <h2>1v1 Multiplayer</h2>
+                <div class="mp-lobby">
+                    <button class="menu-btn" id="btnCreateRoom">Create Room</button>
+                    <div class="mp-divider">or</div>
+                    <div class="mp-join">
+                        <input type="text" id="joinCodeInput" class="mp-code-input" placeholder="Room Code" maxlength="4"
+                            style="text-transform:uppercase; text-align:center; font-size:24px; font-family:Georgia; width:120px; padding:8px;">
+                        <button class="menu-btn" id="btnJoinRoom">Join Room</button>
+                    </div>
+                    <button class="menu-btn small" onclick="Game.setState('MENU')">Back</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('btnCreateRoom').addEventListener('click', () => {
+            const code = Network.createRoom();
+            this._setupNetworkCallbacks();
+            container.querySelector('.mp-lobby').innerHTML = `
+                <div class="mp-room-code">
+                    <p style="color:#8b7355;">Share this code with your opponent:</p>
+                    <div style="font-size:48px; font-family:Georgia; color:#8b6914; letter-spacing:8px; margin:16px 0;">${code}</div>
+                    <p style="color:#8b7355; font-style:italic;">Waiting for opponent to join...</p>
+                </div>
+                <button class="menu-btn small" onclick="Network.leaveRoom(); Game.setState('MENU')">Cancel</button>
+            `;
+        });
+        document.getElementById('btnJoinRoom').addEventListener('click', () => {
+            const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+            if (code.length !== 4) return;
+            Network.joinRoom(code);
+            this._setupNetworkCallbacks();
+            container.querySelector('.mp-lobby').innerHTML = `
+                <p style="color:#8b7355; font-style:italic;">Joining room ${code}...</p>
+                <button class="menu-btn small" onclick="Network.leaveRoom(); Game.setState('MENU')">Cancel</button>
+            `;
+        });
+    },
+
+    _renderMPWaiting() {
+        const container = document.getElementById('multiplayerLobby');
+        if (Network.isHost) {
+            container.innerHTML = `
+                <div class="menu-content">
+                    <h2>Opponent Connected!</h2>
+                    <p style="color:#8b7355;">Select a battlefield to begin.</p>
+                    <div class="map-grid">
+                        ${Array.from(document.querySelectorAll('#mapSelect .map-card')).map(c =>
+                            `<div class="map-card mp-map-card" data-map="${c.dataset.map}">
+                                <img class="map-preview" src="assets/maps/${c.dataset.map}.png" alt="${c.querySelector('span').textContent}">
+                                <span>${c.querySelector('span').textContent}</span>
+                            </div>`
+                        ).join('')}
+                    </div>
+                    <div style="margin-top:12px;">
+                        <label style="color:#8b7355; font-size:13px;">Budget:
+                            <input type="range" id="mpBudgetSlider" min="2000" max="10000" step="500" value="3000"
+                                style="vertical-align:middle; width:150px;">
+                            <span id="mpBudgetValue" style="color:#8b6914; font-weight:bold;">3000</span>
+                        </label>
+                    </div>
+                    <button class="menu-btn small" onclick="Network.leaveRoom(); Game.setState('MENU')">Cancel</button>
+                </div>
+            `;
+            // Budget slider
+            const slider = document.getElementById('mpBudgetSlider');
+            const valSpan = document.getElementById('mpBudgetValue');
+            slider.addEventListener('input', () => { valSpan.textContent = slider.value; });
+            // Map card clicks
+            container.querySelectorAll('.mp-map-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    const map = e.currentTarget.dataset.map;
+                    this.selectedMap = map;
+                    this._mpSeed = Math.floor(Math.random() * 100000);
+                    Army.budget = parseInt(slider.value);
+                    Army.remaining = Army.budget;
+                    Network.sendMapSelection(map, this._mpSeed, Army.budget);
+                    this.setState('ARMY_SETUP');
+                });
+            });
+        } else {
+            container.innerHTML = `
+                <div class="menu-content">
+                    <h2>Connected!</h2>
+                    <p style="color:#8b7355; font-style:italic;">Waiting for host to select a map...</p>
+                    <button class="menu-btn small" onclick="Network.leaveRoom(); Game.setState('MENU')">Cancel</button>
+                </div>
+            `;
+        }
+    },
+
+    _setupNetworkCallbacks() {
+        // Peer joins lobby
+        Network.onPeerJoin = () => {
+            this.setState('MP_WAITING');
+        };
+
+        // Guest receives map selection from host
+        Network.onMapSelected = (map, seed, budget) => {
+            this.selectedMap = map;
+            this._mpSeed = seed;
+            Army.budget = budget;
+            Army.remaining = budget;
+            this.setState('ARMY_SETUP');
+        };
+
+        // Peer sends ready with army data
+        Network.onPeerReady = (peerArmy) => {
+            // If we're also ready, create opponent army and start
+            if (Network._selfReady) {
+                this._mpCreateOpponentArmy(peerArmy);
+                if (Network.isHost) {
+                    Network.sendBattleStart();
+                    this.setState('BATTLE');
+                }
+            }
+        };
+
+        // Battle start signal (guest receives)
+        Network.onBattleStart = () => {
+            if (!Network.isHost && Network._peerArmy) {
+                this._mpCreateOpponentArmy(Network._peerArmy);
+                this.setState('BATTLE');
+            }
+        };
+
+        // Peer un-readies
+        Network.onPeerUnready = () => {
+            // Nothing to do — they'll re-ready when done
+        };
+
+        // Host receives guest commands during battle
+        Network.onCommand = (cmd) => {
+            if (!Network.isHost) return;
+            this._mpApplyGuestCommand(cmd);
+        };
+
+        // Guest receives state during battle
+        Network.onState = (state) => {
+            if (Network.isHost) return;
+            this._mpApplyState(state);
+        };
+
+        // Battle result
+        Network.onBattleResult = (winner) => {
+            if (!Network.isHost) {
+                // Guest: show result
+                this.setState('RESULT');
+            }
+        };
+
+        // Peer disconnected
+        Network.onPeerDisconnect = () => {
+            if (this.state === 'BATTLE') {
+                Game.gameSpeed = 0; // pause
+                Network.stopBroadcasting();
+            }
+            alert('Opponent disconnected.');
+            Network.leaveRoom();
+            this.setState('MENU');
+        };
+    },
+
+    // Create opponent army from received data
+    _mpCreateOpponentArmy(armyData) {
+        AI.units = [];
+        const opponentPrefix = Network.isHost ? 'g' : 'h';
+        armyData.forEach((uData, i) => {
+            const u = new Unit(uData.type, uData.size, Network.isHost ? 'enemy' : 'player');
+            u.netId = opponentPrefix + i;
+            u.x = uData.x;
+            u.y = uData.y;
+            u.placed = true;
+            AI.units.push(u);
+        });
+    },
+
+    // Host: apply guest command to AI.units
+    _mpApplyGuestCommand(cmd) {
+        if (cmd.type === 'rally') {
+            // Rally all routing guest units
+            for (const u of AI.units) {
+                if (u.alive && u.routing && u.morale < 30) {
+                    u.morale = 35;
+                    u.routing = false;
+                    u.retreatPenalty = 0;
+                }
+            }
+            return;
+        }
+
+        if (!cmd.unitIds) return;
+        const units = cmd.unitIds.map(id => Network.findByNetId(AI.units, id)).filter(u => u && u.alive);
+        if (units.length === 0) return;
+
+        switch (cmd.type) {
+            case 'move': {
+                // Apply formation spread if multiple units
+                if (units.length === 1) {
+                    units[0].targetX = cmd.x;
+                    units[0].targetY = cmd.y;
+                    units[0].targetQueue = [];
+                    units[0].holdGround = false;
+                    if (units[0].inCombat) units[0].removeFromAllCombat();
+                } else {
+                    const cols = Math.ceil(Math.sqrt(units.length));
+                    const spacing = 50;
+                    units.forEach((u, idx) => {
+                        const col = idx % cols;
+                        const row = Math.floor(idx / cols);
+                        u.targetX = cmd.x + (col - cols / 2) * spacing;
+                        u.targetY = cmd.y + (row - Math.floor(units.length / cols) / 2) * spacing;
+                        u.targetQueue = [];
+                        u.holdGround = false;
+                        if (u.inCombat) u.removeFromAllCombat();
+                    });
+                }
+                break;
+            }
+            case 'hold':
+                units.forEach(u => { u.holdGround = !u.holdGround; });
+                break;
+            case 'retreat':
+                units.forEach(u => {
+                    if (u.inCombat) {
+                        u.removeFromAllCombat();
+                        u.retreatPenalty = 1.0;
+                    }
+                    u.targetX = GameMap.width + 50;
+                    u.targetY = u.y;
+                    u.targetQueue = [];
+                });
+                break;
+            case 'dig':
+                units.forEach(u => {
+                    if (u.type === UnitType.HEAVY_INFANTRY && u.size === 'legion') {
+                        u.digging = !u.digging;
+                    }
+                });
+                break;
+            case 'waypoint':
+                units.forEach(u => {
+                    if (u.targetX === null) {
+                        u.targetX = cmd.x;
+                        u.targetY = cmd.y;
+                    } else {
+                        u.targetQueue.push({ x: cmd.x, y: cmd.y });
+                    }
+                });
+                break;
+        }
+    },
+
+    // Host: set up state broadcasting
+    _setupHostBroadcast() {
+        Network.startBroadcasting(() => {
+            return {
+                hu: Network.compressUnits(Army.playerUnits),
+                gu: Network.compressUnits(AI.units),
+                ar: Network.compressArrows(Renderer.arrows),
+                bt: this.battleTime,
+                ev: this._battleEvents,
+            };
+        });
+    },
+
+    // Guest: apply received state to local units
+    _mpApplyState(state) {
+        if (!state) return;
+
+        // Host units → guest sees them as AI.units (enemies)
+        if (state.hostUnits) {
+            for (const uData of state.hostUnits) {
+                const u = Network.findByNetId(AI.units, uData.nid);
+                if (!u) continue;
+                u.x = uData.x; u.y = uData.y;
+                u.angle = uData.a;
+                u.hp = uData.hp; u.maxHp = uData.mhp;
+                u.morale = uData.mo;
+                u.routing = !!uData.rt;
+                u.digging = !!uData.dg;
+                u.alive = !!uData.al;
+                u.targetX = uData.tx; u.targetY = uData.ty;
+            }
+        }
+        // Guest units → guest sees them as Army.playerUnits (own side)
+        if (state.guestUnits) {
+            for (const uData of state.guestUnits) {
+                const u = Network.findByNetId(Army.playerUnits, uData.nid);
+                if (!u) continue;
+                u.x = uData.x; u.y = uData.y;
+                u.angle = uData.a;
+                u.hp = uData.hp; u.maxHp = uData.mhp;
+                u.morale = uData.mo;
+                u.routing = !!uData.rt;
+                u.digging = !!uData.dg;
+                u.alive = !!uData.al;
+                u.targetX = uData.tx; u.targetY = uData.ty;
+            }
+        }
+        // Sync battle time and arrows
+        this.battleTime = state.battleTime || 0;
+        Renderer.battleTimer = this.battleTime;
+
+        // Update timer display
+        const timerEl = document.getElementById('battleTimer');
+        if (timerEl) {
+            const m = Math.floor(this.battleTime / 60);
+            const s = Math.floor(this.battleTime % 60);
+            timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Update hotbar
+        this._updateHotbar();
+
+        // Check win/loss from state
+        const playerAlive = Army.playerUnits.some(u => u.alive);
+        const enemyAlive = AI.units.some(u => u.alive);
+        if (!playerAlive || !enemyAlive) {
+            this.setState('RESULT');
+        }
+    },
+
     _shortLabel(unitType) {
         const labels = {
             light_infantry: 'Lt Inf',
@@ -438,12 +806,15 @@ const Game = {
         // Hold Ground button
         document.getElementById('btnHold').addEventListener('click', () => {
             const selected = Army.playerUnits.filter(u => u.alive && u.selected);
-            if (selected.length > 0) {
-                const anyHolding = selected.some(u => u.holdGround);
-                for (const u of selected) {
-                    u.holdGround = !anyHolding;
-                    if (u.holdGround) { u.targetX = null; u.targetY = null; }
-                }
+            if (selected.length === 0) return;
+            if (Network.isMultiplayer && !Network.isHost) {
+                Network.sendCommand({ type: 'hold', unitIds: selected.map(u => u.netId) });
+                return;
+            }
+            const anyHolding = selected.some(u => u.holdGround);
+            for (const u of selected) {
+                u.holdGround = !anyHolding;
+                if (u.holdGround) { u.targetX = null; u.targetY = null; }
             }
         });
 
@@ -958,13 +1329,18 @@ const Game = {
                 break;
 
             case 'BATTLE':
-                // Fixed timestep physics — accumulate frame time scaled by game speed
-                this._physicsAccum += frameDt * this.gameSpeed;
-                while (this._physicsAccum >= this._PHYSICS_DT && this.state === 'BATTLE') {
-                    this._updateBattle(this._PHYSICS_DT);
-                    this._physicsAccum -= this._PHYSICS_DT;
+                if (Network.isMultiplayer && !Network.isHost) {
+                    // Guest: no physics, just render from received state
+                    this._renderBattle(frameDt);
+                } else {
+                    // Host or single-player: run physics
+                    this._physicsAccum += frameDt * this.gameSpeed;
+                    while (this._physicsAccum >= this._PHYSICS_DT && this.state === 'BATTLE') {
+                        this._updateBattle(this._PHYSICS_DT);
+                        this._physicsAccum -= this._PHYSICS_DT;
+                    }
+                    this._renderBattle(frameDt);
                 }
-                this._renderBattle(frameDt);
                 break;
         }
 

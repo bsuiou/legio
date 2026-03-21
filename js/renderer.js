@@ -78,16 +78,18 @@ const Renderer = {
             this.ctx.stroke();
             this.ctx.setLineDash([]);
         } else {
-            // Default: highlight left 1/6
             const zoneW = GameMap.width / 6;
-            this.ctx.fillStyle = 'rgba(40, 100, 40, 0.08)';
-            this.ctx.fillRect(0, 0, zoneW, GameMap.height);
+            const isGuestSide = Network.isMultiplayer && !Network.isHost;
+            const zoneX = isGuestSide ? GameMap.width - zoneW : 0;
+            const lineX = isGuestSide ? GameMap.width - zoneW : zoneW;
+            this.ctx.fillStyle = isGuestSide ? 'rgba(100, 40, 40, 0.08)' : 'rgba(40, 100, 40, 0.08)';
+            this.ctx.fillRect(zoneX, 0, zoneW, GameMap.height);
             this.ctx.strokeStyle = 'rgba(139, 105, 20, 0.4)';
             this.ctx.lineWidth = 2;
             this.ctx.setLineDash([10, 10]);
             this.ctx.beginPath();
-            this.ctx.moveTo(zoneW, 0);
-            this.ctx.lineTo(zoneW, GameMap.height);
+            this.ctx.moveTo(lineX, 0);
+            this.ctx.lineTo(lineX, GameMap.height);
             this.ctx.stroke();
             this.ctx.setLineDash([]);
         }
@@ -614,6 +616,35 @@ const Renderer = {
             ctx.strokeStyle = `rgba(220, 50, 30, ${alpha * 0.3})`;
             ctx.lineWidth = 1;
             ctx.stroke();
+
+            // Draw queued waypoints
+            if (u.targetQueue && u.targetQueue.length > 0) {
+                let prevX = u.targetX, prevY = u.targetY;
+                ctx.setLineDash([4, 4]);
+                for (let wi = 0; wi < u.targetQueue.length; wi++) {
+                    const wp = u.targetQueue[wi];
+                    // Dashed line from previous point
+                    ctx.strokeStyle = 'rgba(220, 160, 30, 0.4)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(prevX, prevY);
+                    ctx.lineTo(wp.x, wp.y);
+                    ctx.stroke();
+                    // Small dot at waypoint
+                    ctx.beginPath();
+                    ctx.arc(wp.x, wp.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(220, 160, 30, 0.6)';
+                    ctx.fill();
+                    // Number label
+                    ctx.fillStyle = 'rgba(220, 160, 30, 0.7)';
+                    ctx.font = '9px Georgia';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(wi + 1, wp.x, wp.y - 7);
+                    prevX = wp.x;
+                    prevY = wp.y;
+                }
+                ctx.setLineDash([]);
+            }
         }
 
         ctx.restore();

@@ -1216,3 +1216,43 @@ img.map-preview {
     margin-top: 16px;
     flex-wrap: wrap;
 }
+
+/* --- Multiplayer Lobby --- */
+.mp-lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+.mp-divider {
+    color: #8b7355;
+    font-style: italic;
+    font-size: 14px;
+}
+.mp-join {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.mp-code-input {
+    background: rgba(139, 105, 20, 0.1);
+    border: 2px solid rgba(139, 105, 20, 0.4);
+    color: #5c3d20;
+    border-radius: 4px;
+    font-family: Georgia, serif;
+}
+.mp-code-input:focus {
+    outline: none;
+    border-color: #8b6914;
+}
+.mp-room-code {
+    text-align: center;
+}
+.mp-map-card {
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.mp-map-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 0 12px rgba(139, 105, 20, 0.4);
+}

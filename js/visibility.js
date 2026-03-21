@@ -112,6 +112,7 @@ const Visibility = {
 
     // Render the fog overlay onto the small canvas
     renderFogOverlay() {
+        if (Network.isMultiplayer) return; // disabled in multiplayer v1
         const ctx = this.fogCtx;
         const w = this.gridW;
         const h = this.gridH;
@@ -138,6 +139,7 @@ const Visibility = {
 
     // Check if a world coordinate is visible to a team
     isVisible(x, y, team) {
+        if (Network.isMultiplayer) return true; // no fog in multiplayer v1
         const grid = team === 'player' ? this.playerGrid : this.enemyGrid;
         const cx = Math.floor(x / this.CELL_SIZE);
         const cy = Math.floor(y / this.CELL_SIZE);

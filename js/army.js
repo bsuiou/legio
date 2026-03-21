@@ -187,6 +187,12 @@ const Army = {
             }
         });
 
+        // Hide budget slider in multiplayer (host already chose budget)
+        if (Network.isMultiplayer) {
+            const slider = document.getElementById('budgetSlider');
+            if (slider) slider.parentElement.style.display = 'none';
+        }
+
         document.getElementById('budgetSlider').addEventListener('input', (e) => {
             const newBudget = parseInt(e.target.value);
             // Remove units that exceed new budget
@@ -281,11 +287,35 @@ const Army = {
     _bindPlacementEvents() {
         document.getElementById('btnStartBattle').addEventListener('click', () => {
             const allPlaced = this.rosterForPlacement.every(r => r.placed);
-            if (allPlaced) {
+            if (!allPlaced) return;
+
+            if (Network.isMultiplayer) {
+                // Send ready with army positions
+                const armyData = this.playerUnits.map(u => ({
+                    type: u.type, size: u.size,
+                    x: Math.round(u.x), y: Math.round(u.y)
+                }));
+                Network.sendReady(armyData);
+                // Show waiting message
+                const btn = document.getElementById('btnStartBattle');
+                btn.textContent = 'Waiting for opponent...';
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+
+                // If peer is already ready, start immediately
+                if (Network._peerReady && Network._peerArmy) {
+                    Game._mpCreateOpponentArmy(Network._peerArmy);
+                    if (Network.isHost) {
+                        Network.sendBattleStart();
+                        Game.setState('BATTLE');
+                    }
+                }
+            } else {
                 Game.setState('BATTLE');
             }
         });
         document.getElementById('btnBackPlacement').addEventListener('click', () => {
+            if (Network.isMultiplayer) Network.sendUnready();
             Game.setState('ARMY_SETUP');
         });
     },
@@ -300,6 +330,9 @@ const Army = {
             const cx = GameMap.width / 2, cy = GameMap.height / 2;
             const dist = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
             if (dist > 250) return false; // circular zone radius 250px
+        } else if (Network.isMultiplayer && !Network.isHost) {
+            // Guest: right 1/6 of map
+            if (x < GameMap.width * 5 / 6) return false;
         } else {
             // Default: left 1/6 of map
             if (x > GameMap.width / 6) return false;

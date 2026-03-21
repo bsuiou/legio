@@ -26,9 +26,9 @@ const GameMap = {
     _seed: 12345,
     _perm: null,
 
-    init(mapType) {
+    init(mapType, seed) {
         this.mapType = mapType || 'grasslands';
-        this._seed = Math.floor(Math.random() * 100000);
+        this._seed = seed || Math.floor(Math.random() * 100000);
         this._generatePermutation();
         this.heightData = this._generateHeightmap();
         // Generate river before terrain so features avoid the river
