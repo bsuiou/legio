@@ -460,7 +460,7 @@ const Renderer = {
         const pMaxStr = playerUnits.reduce((s, u) => s + u.maxHp, 0);
         const eMaxStr = enemyUnits.reduce((s, u) => s + u.maxHp, 0);
 
-        const boxW = 260, boxH = 80;
+        const boxW = 300, boxH = 80;
         const boxX = 10, boxY = 10;
         const barW = 160, barH = 10, barX = 90, barGap = 6;
 

@@ -415,6 +415,7 @@ const Input = {
             u.holdGround = false; // Moving cancels hold ground
             u.targetQueue = []; // Clear waypoint queue on new command
             u.idleTime = 0; // Reset idle timer on manual command
+            u._bridgeRouted = false; // Allow new bridge routing
         }
 
         // Assign targets

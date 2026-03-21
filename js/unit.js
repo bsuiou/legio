@@ -316,11 +316,42 @@ class Unit {
         // Movement toward target
         if (this.targetX !== null && this.targetY !== null) {
             this.idleTime = 0;
+
+            // Bridge routing: if path crosses a river, redirect through nearest bridge
+            if (GameMap.river && GameMap.bridges.length > 0 && !this._bridgeRouted) {
+                const cr2 = this.getCollisionRadius();
+                // Check if target is across the river (unit blocked, target on other side)
+                const unitBlocked = GameMap.isRiverBlocking(this.x + (this.targetX - this.x) * 0.3, this.y + (this.targetY - this.y) * 0.3, cr2);
+                if (unitBlocked) {
+                    // Find nearest bridge
+                    let bestBridge = null, bestDist = Infinity;
+                    for (const b of GameMap.bridges) {
+                        const bd = Math.sqrt((b.x - this.x) ** 2 + (b.y - this.y) ** 2);
+                        // Prefer bridges that are roughly between us and target
+                        const bToTarget = Math.sqrt((b.x - this.targetX) ** 2 + (b.y - this.targetY) ** 2);
+                        const totalVia = bd + bToTarget;
+                        if (totalVia < bestDist) {
+                            bestDist = totalVia;
+                            bestBridge = b;
+                        }
+                    }
+                    if (bestBridge) {
+                        // Insert bridge as waypoint, keep original target
+                        this.targetQueue.unshift({ x: this.targetX, y: this.targetY });
+                        this.targetX = bestBridge.x;
+                        this.targetY = bestBridge.y;
+                        this._bridgeRouted = true;
+                    }
+                }
+            }
+            // Reset bridge routing flag when target changes (arrival clears it)
+
             const dx = this.targetX - this.x;
             const dy = this.targetY - this.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist < 15) {
+                this._bridgeRouted = false;
                 // Pop next waypoint from queue if any
                 if (this.targetQueue.length > 0) {
                     const next = this.targetQueue.shift();
