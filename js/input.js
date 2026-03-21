@@ -173,6 +173,10 @@ const Input = {
                         this._applyLineDragPositions(selected, this._lineDragPreview);
                     }
                     this._rightDragConsumed = true;
+                } else if (e.shiftKey && !this._rightDragging && Game.state === 'BATTLE') {
+                    // Shift+right-click on mouseup — queue waypoint (more reliable than contextmenu)
+                    this._handleQueueWaypoint(g.x, g.y);
+                    this._rightDragConsumed = true; // prevent contextmenu from double-firing
                 }
                 this._rightDragging = false;
                 this._rightDragActive = false;
