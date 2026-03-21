@@ -158,11 +158,11 @@ const Combat = {
 
         const touchDist = unitA.getCollisionRadius() + unitB.getCollisionRadius();
         const penetration = touchDist - dist;
-        // Only push if significantly overlapping (>3px), ignore minor touches
-        if (penetration > 3) {
+        // Only push if significantly overlapping (>5px), gentle push to reduce combat sliding
+        if (penetration > 5) {
             const nx = dx / dist;
             const ny = dy / dist;
-            const push = (penetration - 3) * 0.3;
+            const push = (penetration - 5) * 0.08;
             unitA.x -= nx * push;
             unitA.y -= ny * push;
             unitB.x += nx * push;
