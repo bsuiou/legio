@@ -163,16 +163,21 @@ const Combat = {
             const nx = dx / dist;
             const ny = dy / dist;
             const push = (penetration - 5) * 0.08;
-            unitA.x -= nx * push;
-            unitA.y -= ny * push;
-            unitB.x += nx * push;
-            unitB.y += ny * push;
             const rA = unitA.getCollisionRadius();
             const rB = unitB.getCollisionRadius();
-            unitA.x = Math.max(rA, Math.min(GameMap.width - rA, unitA.x));
-            unitA.y = Math.max(rA, Math.min(GameMap.height - rA, unitA.y));
-            unitB.x = Math.max(rB, Math.min(GameMap.width - rB, unitB.x));
-            unitB.y = Math.max(rB, Math.min(GameMap.height - rB, unitB.y));
+            // Check river/ditch before applying push — never push units into water
+            const newAx = unitA.x - nx * push;
+            const newAy = unitA.y - ny * push;
+            const newBx = unitB.x + nx * push;
+            const newBy = unitB.y + ny * push;
+            if (!GameMap.isRiverBlocking(newAx, newAy, rA)) {
+                unitA.x = Math.max(rA, Math.min(GameMap.width - rA, newAx));
+                unitA.y = Math.max(rA, Math.min(GameMap.height - rA, newAy));
+            }
+            if (!GameMap.isRiverBlocking(newBx, newBy, rB)) {
+                unitB.x = Math.max(rB, Math.min(GameMap.width - rB, newBx));
+                unitB.y = Math.max(rB, Math.min(GameMap.height - rB, newBy));
+            }
         }
     },
 

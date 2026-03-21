@@ -478,19 +478,18 @@ class Unit {
                     this.y += moveY - dot * slide.ny;
                 } else if (GameMap.isRiverBlocking(newX, newY, cr)) {
                     // River blocking — slide along river bank
-                    // Also push unit out if somehow already inside the river
+                    const prevX = this.x, prevY = this.y;
                     const slide = GameMap.getRiverSlideDirection(newX, newY, cr);
                     if (slide.nx !== 0 || slide.ny !== 0) {
                         const dot = moveX * slide.nx + moveY * slide.ny;
                         this.x += moveX - dot * slide.nx;
                         this.y += moveY - dot * slide.ny;
-                        // If still in river after slide, push out
-                        if (GameMap.isRiverBlocking(this.x, this.y, cr)) {
-                            this.x += slide.nx * 2;
-                            this.y += slide.ny * 2;
-                        }
                     }
-                    // Don't move if no slide direction found
+                    // Safety: if still in river after slide, revert to previous position
+                    if (GameMap.isRiverBlocking(this.x, this.y, cr)) {
+                        this.x = prevX;
+                        this.y = prevY;
+                    }
                 } else {
                     this.x = newX;
                     this.y = newY;
@@ -499,6 +498,15 @@ class Unit {
                 // Clamp to map bounds
                 this.x = Math.max(cr, Math.min(GameMap.width - cr, this.x));
                 this.y = Math.max(cr, Math.min(GameMap.height - cr, this.y));
+
+                // Final river safety — if somehow in water, push toward nearest bank
+                if (GameMap.river && GameMap.isRiverBlocking(this.x, this.y, cr)) {
+                    const bankSlide = GameMap.getRiverSlideDirection(this.x, this.y, cr);
+                    if (bankSlide.nx !== 0 || bankSlide.ny !== 0) {
+                        this.x += bankSlide.nx * 3;
+                        this.y += bankSlide.ny * 3;
+                    }
+                }
 
                 // Stuck detection: if not making progress toward target for 3+ seconds, nudge gradually
                 if (this.targetX !== null) {
