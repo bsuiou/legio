@@ -206,10 +206,20 @@ const Game = {
         }
     },
 
+    // Multiplayer: store the authoritative result from host
+    _mpVictoryOverride: null,
+
     _showResult() {
         const playerAlive = Army.playerUnits.filter(u => u.alive);
         const enemyAlive = AI.units.filter(u => u.alive);
-        const victory = enemyAlive.length === 0;
+        // In multiplayer, use the authoritative result from host if available
+        let victory;
+        if (Network.isMultiplayer && this._mpVictoryOverride !== null) {
+            victory = this._mpVictoryOverride;
+            this._mpVictoryOverride = null;
+        } else {
+            victory = enemyAlive.length === 0;
+        }
 
         // Multiplayer: stop broadcasting, notify peer
         if (Network.isMultiplayer) {
@@ -525,10 +535,11 @@ const Game = {
             this._mpApplyState(state);
         };
 
-        // Battle result
+        // Battle result (guest receives authoritative winner from host)
         Network.onBattleResult = (winner) => {
             if (!Network.isHost) {
-                // Guest: show result
+                // 'guest' means the guest won, 'host' means the host won
+                this._mpVictoryOverride = (winner === 'guest');
                 this.setState('RESULT');
             }
         };
@@ -648,60 +659,105 @@ const Game = {
         });
     },
 
-    // Guest: apply received state to local units
+    // Guest: store received state snapshot for interpolation
+    _mpPrevSnapshot: null,
+    _mpCurrSnapshot: null,
+
     _mpApplyState(state) {
         if (!state) return;
+        // Push into interpolation buffer
+        this._mpPrevSnapshot = this._mpCurrSnapshot;
+        this._mpCurrSnapshot = { time: Date.now(), data: state };
 
-        // Host units → guest sees them as AI.units (enemies)
-        if (state.hostUnits) {
-            for (const uData of state.hostUnits) {
-                const u = Network.findByNetId(AI.units, uData.nid);
+        // Immediately apply boolean/discrete states (alive, routing, etc)
+        const applyDiscrete = (units, dataArr) => {
+            if (!dataArr) return;
+            for (const uData of dataArr) {
+                const u = Network.findByNetId(units, uData.nid);
                 if (!u) continue;
-                u.x = uData.x; u.y = uData.y;
-                u.angle = uData.a;
-                u.hp = uData.hp; u.maxHp = uData.mhp;
-                u.morale = uData.mo;
                 u.routing = !!uData.rt;
                 u.digging = !!uData.dg;
                 u.alive = !!uData.al;
+                u.maxHp = uData.mhp;
                 u.targetX = uData.tx; u.targetY = uData.ty;
+                // Snap inCombat state from flag
+                u._mpInCombat = !!uData.ic;
             }
-        }
-        // Guest units → guest sees them as Army.playerUnits (own side)
-        if (state.guestUnits) {
-            for (const uData of state.guestUnits) {
-                const u = Network.findByNetId(Army.playerUnits, uData.nid);
-                if (!u) continue;
-                u.x = uData.x; u.y = uData.y;
-                u.angle = uData.a;
-                u.hp = uData.hp; u.maxHp = uData.mhp;
-                u.morale = uData.mo;
-                u.routing = !!uData.rt;
-                u.digging = !!uData.dg;
-                u.alive = !!uData.al;
-                u.targetX = uData.tx; u.targetY = uData.ty;
-            }
-        }
-        // Sync battle time and arrows
+        };
+        applyDiscrete(AI.units, state.hostUnits);
+        applyDiscrete(Army.playerUnits, state.guestUnits);
+
+        // Sync arrows and battle time
         this.battleTime = state.battleTime || 0;
         Renderer.battleTimer = this.battleTime;
-
-        // Update timer display
         const timerEl = document.getElementById('battleTimer');
         if (timerEl) {
             const m = Math.floor(this.battleTime / 60);
             const s = Math.floor(this.battleTime % 60);
             timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
         }
-
-        // Update hotbar
         this._updateHotbar();
+    },
 
-        // Check win/loss from state
-        const playerAlive = Army.playerUnits.some(u => u.alive);
-        const enemyAlive = AI.units.some(u => u.alive);
-        if (!playerAlive || !enemyAlive) {
-            this.setState('RESULT');
+    // Guest: interpolate unit positions between snapshots every frame
+    _mpInterpolateUnits() {
+        if (!this._mpCurrSnapshot) return;
+        const curr = this._mpCurrSnapshot.data;
+        const prev = this._mpPrevSnapshot ? this._mpPrevSnapshot.data : null;
+
+        if (!prev) {
+            // No previous snapshot — snap to current
+            this._mpSnapUnits(AI.units, curr.hostUnits);
+            this._mpSnapUnits(Army.playerUnits, curr.guestUnits);
+            return;
+        }
+
+        const dt = this._mpCurrSnapshot.time - this._mpPrevSnapshot.time;
+        if (dt <= 0) {
+            this._mpSnapUnits(AI.units, curr.hostUnits);
+            this._mpSnapUnits(Army.playerUnits, curr.guestUnits);
+            return;
+        }
+
+        const now = Date.now() - 50; // render 50ms behind
+        const t = Math.max(0, Math.min(1.5, (now - this._mpPrevSnapshot.time) / dt));
+
+        this._mpLerpUnits(AI.units, prev.hostUnits, curr.hostUnits, t);
+        this._mpLerpUnits(Army.playerUnits, prev.guestUnits, curr.guestUnits, t);
+    },
+
+    _mpSnapUnits(units, dataArr) {
+        if (!dataArr) return;
+        for (const uData of dataArr) {
+            const u = Network.findByNetId(units, uData.nid);
+            if (!u) continue;
+            u.x = uData.x; u.y = uData.y;
+            u.angle = uData.a;
+            u.hp = uData.hp; u.morale = uData.mo;
+        }
+    },
+
+    _mpLerpUnits(units, prevArr, currArr, t) {
+        if (!currArr) return;
+        const prevMap = {};
+        if (prevArr) for (const u of prevArr) prevMap[u.nid] = u;
+
+        for (const cu of currArr) {
+            const u = Network.findByNetId(units, cu.nid);
+            if (!u) continue;
+            const pu = prevMap[cu.nid];
+            if (!pu) {
+                // New unit or no prev — snap
+                u.x = cu.x; u.y = cu.y; u.angle = cu.a;
+                u.hp = cu.hp; u.morale = cu.mo;
+            } else {
+                // Interpolate continuous values
+                u.x = pu.x + (cu.x - pu.x) * t;
+                u.y = pu.y + (cu.y - pu.y) * t;
+                u.angle = pu.a + (cu.a - pu.a) * t;
+                u.hp = pu.hp + (cu.hp - pu.hp) * t;
+                u.morale = pu.mo + (cu.mo - pu.mo) * t;
+            }
         }
     },
 
@@ -1330,7 +1386,8 @@ const Game = {
 
             case 'BATTLE':
                 if (Network.isMultiplayer && !Network.isHost) {
-                    // Guest: no physics, just render from received state
+                    // Guest: interpolate between state snapshots for smooth movement
+                    this._mpInterpolateUnits();
                     this._renderBattle(frameDt);
                 } else {
                     // Host or single-player: run physics
