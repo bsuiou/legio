@@ -290,11 +290,15 @@ const Combat = {
 
                 const nx = dx / dist;
                 const ny = dy / dist;
-                // Push apart more aggressively to prevent units getting stuck on each other
-                const push = (penetration - 1) * 0.35;
                 const aLocked = a.inCombat;
                 const bLocked = b.inCombat;
                 if (aLocked && bLocked) continue;
+
+                // Same-team moving units get soft collisions to prevent blob clumping
+                const sameTeam = a.team === b.team;
+                const bothMoving = !aLocked && !bLocked && a.targetX !== null && b.targetX !== null;
+                const pushFactor = (sameTeam && bothMoving) ? 0.12 : 0.35;
+                const push = (penetration - 1) * pushFactor;
 
                 if (aLocked) {
                     pushX[j] += nx * push;

@@ -361,22 +361,27 @@ class Unit {
                 // Local avoidance: steer around nearby friendly units blocking the path
                 if (!this.inCombat && this.targetX !== null) {
                     const friendlies = this.team === 'player' ? Army.playerUnits : AI.units;
-                    const cr = this.getCollisionRadius();
+                    const unitCr = this.getCollisionRadius();
+                    const mySpeed = this.speedMod;
                     for (const other of friendlies) {
                         if (other === this || !other.alive) continue;
                         const odx = other.x - this.x;
                         const ody = other.y - this.y;
                         const oDist = Math.sqrt(odx * odx + ody * ody);
-                        const avoidDist = cr + other.getCollisionRadius() + 8;
+                        // Larger avoidance radius for faster units (cavalry sees further ahead)
+                        const speedRatio = mySpeed / (other.speedMod || 1);
+                        const lookAhead = speedRatio > 1.2 ? 20 : 8;
+                        const avoidDist = unitCr + other.getCollisionRadius() + lookAhead;
                         if (oDist >= avoidDist || oDist < 1) continue;
                         // Only avoid if the other unit is roughly ahead of us
                         const dot = moveX * odx + moveY * ody;
-                        if (dot <= 0) continue; // behind us, ignore
-                        // Steer perpendicular — pick the side with more space
+                        if (dot <= 0) continue;
+                        // Steer perpendicular — pick the side closer to target
                         const perpX = -ody / oDist;
                         const perpY = odx / oDist;
-                        const avoidStrength = (avoidDist - oDist) / avoidDist * speed * dt * 0.6;
-                        // Pick side: which perpendicular direction moves us closer to our target?
+                        // Stronger avoidance when we're faster than the blocker (cavalry behind infantry)
+                        const urgency = speedRatio > 1.2 ? 1.2 : 0.6;
+                        const avoidStrength = (avoidDist - oDist) / avoidDist * speed * dt * urgency;
                         const toTargetX = this.targetX - this.x;
                         const toTargetY = this.targetY - this.y;
                         const side = (perpX * toTargetX + perpY * toTargetY) > 0 ? 1 : -1;
