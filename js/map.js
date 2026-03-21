@@ -1364,13 +1364,22 @@ const GameMap = {
             ctx.setLineDash([]);
 
             // --- Generate tree data with type, size, alpha ---
-            const numTrees = Math.floor(f.radius * 1.8);
+            // Use jittered grid for even distribution instead of pure noise (which clumps)
+            const spacing = 18; // base grid spacing between trees
             const trees = [];
-            for (let i = 0; i < numTrees; i++) {
-                const angle = this._noise(i * 2.3 + f.x * 0.01, f.y * 0.01) * Math.PI * 2;
-                const rawDist = Math.abs(this._noise(f.x * 0.01, i * 2.3 + f.y * 0.005)) * f.radius * 1.05;
-                const tx = f.x + Math.cos(angle) * rawDist;
-                const ty = f.y + Math.sin(angle) * rawDist;
+            const gridLeft = f.x - f.radius * 1.1;
+            const gridTop = f.y - f.radius * 1.1;
+            const gridRight = f.x + f.radius * 1.1;
+            const gridBottom = f.y + f.radius * 1.1;
+            let i = 0;
+            for (let gx = gridLeft; gx < gridRight; gx += spacing) {
+                for (let gy = gridTop; gy < gridBottom; gy += spacing) {
+                    i++;
+                    // Jitter each grid point randomly using noise
+                    const jitterX = this._noise(gx * 0.07 + f.x * 0.01, gy * 0.09) * spacing * 0.7;
+                    const jitterY = this._noise(gy * 0.07 + f.y * 0.01, gx * 0.09) * spacing * 0.7;
+                    const tx = gx + jitterX;
+                    const ty = gy + jitterY;
 
                 // Use polygon for containment if available
                 if (f.polygon) {
@@ -1415,6 +1424,7 @@ const GameMap = {
                 const alpha = 0.18 + (1.0 - Math.min(1, distRatio)) * 0.17;
 
                 trees.push({ x: tx, y: ty, size: treeSize, type, alpha });
+                }
             }
 
             // Sort by y-coordinate for depth (southern trees drawn last)
