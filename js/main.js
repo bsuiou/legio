@@ -93,7 +93,16 @@ const Game = {
             case 'ARMY_SETUP':
                 GameMap.init(this.selectedMap, this._mpSeed);
                 if (EndlessCampaign.active) {
-                    EndlessCampaign.renderCampaignSetupUI();
+                    // Proxy endless data onto Campaign so its setup UI works
+                    Campaign.veteranRoster = EndlessCampaign.veteranRoster;
+                    Campaign._currentNodeData = EndlessCampaign._currentNodeData;
+                    Campaign._mercenaries = EndlessCampaign._mercenaries;
+                    Campaign._veteranUpgrades = EndlessCampaign._veteranUpgrades;
+                    Campaign._battleBuffs = EndlessCampaign._battleBuffs;
+                    Campaign.coins = EndlessCampaign.coins;
+                    Campaign._nextVetId = EndlessCampaign._nextVetId;
+                    Campaign.getCompletedBattleCount = () => EndlessCampaign.battleNumber;
+                    Campaign.renderCampaignSetupUI();
                 } else if (Campaign.active) {
                     Campaign.renderCampaignSetupUI();
                 } else {

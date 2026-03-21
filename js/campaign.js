@@ -804,7 +804,8 @@ const Campaign = {
         document.getElementById('btnBackSetup').addEventListener('click', () => {
             Army.playerUnits = [];
             Army.remaining = budget;
-            Game.setState('CAMPAIGN_MAP');
+            for (const v of this.veteranRoster) v.deployed = false;
+            Game.setState(EndlessCampaign.active ? 'ENDLESS_MAP' : 'CAMPAIGN_MAP');
         });
     },
 
