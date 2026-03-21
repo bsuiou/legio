@@ -269,6 +269,7 @@ const Army = {
             <div class="placement-roster" id="placementRoster"></div>
             <div style="display:flex; gap:10px; align-items:center;">
                 <span id="placementHint" style="font-style:italic; margin-right:10px;">Select a unit type, then click the map to place it</span>
+                <button id="btnBackPlacement" class="menu-btn small" style="font-size:11px; padding:4px 10px;">Back</button>
                 <button id="btnStartBattle" class="menu-btn small" disabled style="opacity:0.5">Start Battle</button>
             </div>
         `;
@@ -283,6 +284,9 @@ const Army = {
             if (allPlaced) {
                 Game.setState('BATTLE');
             }
+        });
+        document.getElementById('btnBackPlacement').addEventListener('click', () => {
+            Game.setState('ARMY_SETUP');
         });
     },
 

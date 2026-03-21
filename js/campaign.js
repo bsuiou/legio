@@ -165,8 +165,7 @@ const Campaign = {
         this._nextVetId = 0;
         this._veteranUpgrades = {};
         this._resetBattleBuffs();
-        // Show shop before first battle
-        Game.setState('CAMPAIGN_SHOP');
+        Game.setState('CAMPAIGN_MAP');
     },
 
     // --- Shop Phase ---
@@ -302,12 +301,7 @@ const Campaign = {
     },
 
     _exitShop() {
-        const node = this.getCurrentNode();
-        if (node.type === 'village') {
-            this.startVillageEvent();
-            return;
-        }
-        this.startBattle(node.id);
+        Game.setState('ARMY_SETUP');
     },
 
     _exitShopToMap() {
@@ -508,7 +502,6 @@ const Campaign = {
                 </div>
                 ${forkUI}
                 <div style="margin-top:8px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-                    ${!this._pendingFork ? `<button class="menu-btn" onclick="Game.setState('CAMPAIGN_SHOP')">\u{1FA99} Shop</button>` : ''}
                     <button class="menu-btn small" onclick="Campaign.active=false; Game.setState('MENU')">Back to Menu</button>
                 </div>
             </div>
@@ -536,7 +529,7 @@ const Campaign = {
         Game.selectedMap = node.map;
         Army.budget = node.pBudget;
         Army.remaining = node.pBudget;
-        Game.setState('ARMY_SETUP');
+        Game.setState('CAMPAIGN_SHOP');
     },
 
     _renderScoutReport(node) {
@@ -902,7 +895,7 @@ const Campaign = {
         } else if (victory) {
             title = 'Victory!';
             titleClass = 'victory';
-            buttonHTML = `<button class="menu-btn" onclick="Game.setState('CAMPAIGN_SHOP')">Continue Campaign</button>`;
+            buttonHTML = `<button class="menu-btn" onclick="Game.setState('CAMPAIGN_MAP')">Continue Campaign</button>`;
         } else {
             title = 'Defeat \u2014 Campaign Over';
             titleClass = 'defeat';

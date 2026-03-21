@@ -45,7 +45,6 @@ const Game = {
 
             case 'MAP_SELECT':
                 document.getElementById('mapSelect').classList.remove('hidden');
-                this._generateMapPreviews();
                 break;
 
             case 'SPECTATOR_SETUP':
@@ -238,169 +237,6 @@ const Game = {
         `;
     },
 
-    _mapPreviewsGenerated: false,
-
-    _generateMapPreviews() {
-        if (this._mapPreviewsGenerated) return;
-        this._mapPreviewsGenerated = true;
-
-        const maps = [
-            { type: 'grasslands', seed: 42, selector: '.grasslands-preview' },
-            { type: 'river', seed: 77, selector: '.river-preview' },
-            { type: 'hillfort', seed: 55, selector: '.hillfort-preview' },
-            { type: 'dense_forest', seed: 33, selector: '.dense-forest-preview' },
-            { type: 'rolling_hills', seed: 91, selector: '.rolling-hills-preview' },
-            { type: 'narrow_pass', seed: 61, selector: '.narrow-pass-preview' },
-            { type: 'twin_rivers', seed: 44, selector: '.twin-rivers-preview' },
-            { type: 'forest_river', seed: 28, selector: '.forest-river-preview' },
-            { type: 'scattered_rocks', seed: 73, selector: '.scattered-rocks-preview' },
-            { type: 'roman_road', seed: 85, selector: '.roman-road-preview' },
-            { type: 'ambush', seed: 37, selector: '.ambush-preview' }
-        ];
-
-        // Generate previews asynchronously — one per frame to avoid UI freeze
-        let idx = 0;
-        const generateNext = () => {
-            if (idx >= maps.length) return;
-            const m = maps[idx++];
-            this._generateOnePreview(m);
-            setTimeout(generateNext, 0);
-        };
-        generateNext();
-    },
-
-    _generateOnePreview(m) {
-        {  // block scope for saved state variables
-            const el = document.querySelector(m.selector);
-            if (!el) return;
-
-            // Save current map state
-            const savedSeed = GameMap._seed;
-            const savedPerm = GameMap._perm;
-            const savedHeight = GameMap.heightData;
-            const savedCols = GameMap._cols;
-            const savedRows = GameMap._rows;
-            const savedForests = GameMap.forests;
-            const savedHills = GameMap.hills;
-            const savedRiver = GameMap.river;
-            const savedBridges = GameMap.bridges;
-            const savedMapType = GameMap.mapType;
-            const savedCanvas = GameMap.canvas;
-            const savedDitches = GameMap.ditches;
-            const savedTwinRiver = GameMap._twinRiverData;
-            const savedRoads = GameMap.roads;
-            const savedWidth = GameMap.width;
-            const savedHeight2 = GameMap.height;
-            const savedGridSize = GameMap.gridSize;
-
-            // Render at reduced resolution for thumbnails (480×270 instead of 1920×1080)
-            GameMap.width = 480;
-            GameMap.height = 270;
-            GameMap.gridSize = 4; // keep same grid size — fewer cells at smaller dimensions
-
-            // Generate a mini map with fixed seed
-            GameMap._seed = m.seed;
-            GameMap.mapType = m.type;
-            GameMap._generatePermutation();
-            GameMap.heightData = GameMap._generateHeightmap();
-            GameMap.river = null;
-            GameMap.bridges = [];
-            GameMap.ditches = [];
-            GameMap.roads = [];
-            GameMap._twinRiverData = null;
-            GameMap._pendingHills = [];
-            GameMap._roadMask = null;
-            // Pre-compute hill positions for maps that need it
-            if (m.type === 'grasslands' || m.type === 'river') {
-                GameMap._precomputeHillPositions();
-            }
-            if (m.type === 'roman_road') {
-                GameMap._generateRomanRoad();
-            }
-            if (m.type === 'grasslands') {
-                GameMap._generateGrasslandsRoad();
-            }
-            if (m.type === 'river' || m.type === 'forest_river') {
-                GameMap._generateRiver();
-                GameMap._generateBridges();
-            } else if (m.type === 'twin_rivers') {
-                // Twin rivers handled in terrain gen
-            }
-            // Roads that depend on rivers/bridges
-            if (m.type === 'river') {
-                GameMap._generateRiverCrossingRoad();
-            } else if (m.type === 'twin_rivers') {
-                GameMap._generateTwinRiversRoad();
-            } else if (m.type === 'narrow_pass') {
-                GameMap._generateNarrowPassRoad();
-            } else if (m.type === 'dense_forest') {
-                GameMap._generateDenseForestRoad();
-            }
-            // Build road mask for forest tinting exclusion
-            if (GameMap.roads.length > 0) {
-                GameMap._buildRoadMask();
-            }
-            if (m.type === 'hillfort') {
-                GameMap._generateHillfortTerrain();
-            } else if (m.type === 'dense_forest') {
-                GameMap._generateDenseForestTerrain();
-            } else if (m.type === 'rolling_hills') {
-                GameMap._generateRollingHillsTerrain();
-            } else if (m.type === 'narrow_pass') {
-                GameMap._generateNarrowPassTerrain();
-            } else if (m.type === 'scattered_rocks') {
-                GameMap._generateScatteredRocksTerrain();
-            } else if (m.type === 'roman_road') {
-                GameMap._generateRomanRoadTerrain();
-            } else if (m.type === 'ambush') {
-                GameMap._generateAmbushTerrain();
-            } else if (m.type === 'twin_rivers') {
-                GameMap._generateTwinRiversTerrain();
-                GameMap._generateTwinRivers();
-            } else if (m.type === 'forest_river') {
-                GameMap._generateForestRiverTerrain();
-            } else {
-                GameMap._generateTerrainFeatures();
-            }
-            GameMap._applyHillsToHeightmap();
-            GameMap.peaks = [];
-
-            // Render at reduced resolution directly
-            GameMap.canvas = document.createElement('canvas');
-            GameMap.canvas.width = GameMap.width;
-            GameMap.canvas.height = GameMap.height;
-            GameMap._renderMap();
-
-            // Use rendered canvas directly as thumbnail
-            const thumb = GameMap.canvas;
-            thumb.style.width = '100%';
-            thumb.style.height = '100%';
-            thumb.style.display = 'block';
-            thumb.style.borderRadius = '2px';
-
-            el.innerHTML = '';
-            el.appendChild(thumb);
-
-            // Restore map state
-            GameMap._seed = savedSeed;
-            GameMap._perm = savedPerm;
-            GameMap.heightData = savedHeight;
-            GameMap._cols = savedCols;
-            GameMap._rows = savedRows;
-            GameMap.forests = savedForests;
-            GameMap.hills = savedHills;
-            GameMap.river = savedRiver;
-            GameMap.bridges = savedBridges;
-            GameMap.mapType = savedMapType;
-            GameMap.canvas = savedCanvas;
-            GameMap.ditches = savedDitches;
-            GameMap._twinRiverData = savedTwinRiver;
-            GameMap.roads = savedRoads;
-            GameMap.width = savedWidth;
-            GameMap.height = savedHeight2;
-            GameMap.gridSize = savedGridSize;
-        }
-    },
 
     _showModifiers() {
         const container = document.getElementById('modifiersScreen');
@@ -562,6 +398,7 @@ const Game = {
                 <button id="btnDig" class="dig-btn hidden" title="Dig Ditch (D) — Legion only">⛏ Dig Ditch</button>
                 <button id="btnRally" class="rally-btn" title="Rally routing units (G)">🏳 Rally</button>
                 <button id="btnRetreat" class="retreat-btn" title="Retreat selected units (R)">⟵ Retreat</button>
+                <button id="btnSurrender" class="surrender-btn" title="Surrender and exit battle">✕ Exit</button>
                 <span id="battleTimer">0:00</span>
             </div>
             <button id="btnSpeed" class="speed-btn" onclick="Game.cycleSpeed()" title="Game Speed">${this._speedLabels[this._speedSteps.indexOf(this.gameSpeed)]}</button>
@@ -606,6 +443,18 @@ const Game = {
         // Dig Ditch button
         document.getElementById('btnDig').addEventListener('click', () => {
             Input._handleDigToggle();
+        });
+
+        // Surrender / exit battle button
+        document.getElementById('btnSurrender').addEventListener('click', () => {
+            if (confirm('Exit this battle?')) {
+                if (Campaign.active) {
+                    Game.setState('RESULT');
+                    Game._showResult();
+                } else {
+                    Game.setState('MENU');
+                }
+            }
         });
 
         // Bind click handlers (shift to add to selection)

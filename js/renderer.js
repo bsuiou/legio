@@ -726,6 +726,25 @@ const Renderer = {
 
         const lines = [name, hpText];
 
+        // Veteran / mercenary status
+        let statusLineIdx = -1;
+        if (unit._veteranId) {
+            let vetLine = 'Veteran';
+            const dmgUps = unit._vetDamageUps || 0;
+            const armUps = unit._vetArmorUps || 0;
+            if (dmgUps > 0 || armUps > 0) {
+                const parts = [];
+                if (dmgUps > 0) parts.push(`+${dmgUps * 15}% dmg`);
+                if (armUps > 0) parts.push(`+${armUps * 15}% armor`);
+                vetLine += ` (${parts.join(', ')})`;
+            }
+            statusLineIdx = lines.length;
+            lines.push(vetLine);
+        } else if (unit._isMercenary) {
+            statusLineIdx = lines.length;
+            lines.push('Mercenary');
+        }
+
         // Terrain info
         const forestOvl = GameMap.getForestOverlap(unit.x, unit.y, unit.getCollisionRadius());
         if (forestOvl > 0.05) lines.push(`Forest: ${Math.round(forestOvl * 100)}%`);
@@ -771,7 +790,11 @@ const Renderer = {
         const isPlayer = unit.team === 'player';
         ctx.fillStyle = isPlayer ? '#a0d090' : '#e0a080';
         for (let i = 0; i < lines.length; i++) {
-            if (i > 0) ctx.fillStyle = '#c0b898';
+            if (i === statusLineIdx) {
+                ctx.fillStyle = unit._isMercenary ? '#d4a040' : '#e0c060';
+            } else if (i > 0) {
+                ctx.fillStyle = '#c0b898';
+            }
             ctx.fillText(lines[i], tx + padX, ty + padY + (i + 1) * lineH - 3);
         }
 

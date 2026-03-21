@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Generate Map Preview Thumbnails</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: #ddd; }
+        h1 { color: #c0a040; }
+        .preview-row { display: flex; align-items: center; gap: 16px; margin: 12px 0; }
+        .preview-row canvas { border: 1px solid #555; }
+        .preview-row a { color: #6af; }
+        #status { margin: 16px 0; color: #aaa; }
+        button { padding: 10px 24px; font-size: 16px; cursor: pointer; background: #c0a040; border: none; border-radius: 4px; color: #1a1a1a; font-weight: bold; }
+        button:hover { background: #d4b454; }
+        #downloadAll { margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Map Preview Thumbnail Generator</h1>
+    <p>This page generates all 11 map preview thumbnails as PNG files for static use.</p>
+    <p>Click "Generate All" to render them, then "Download All" to save them to your downloads folder.<br>
+    Move the downloaded PNGs into <code>assets/maps/</code>.</p>
+    <button id="btnGenerate">Generate All</button>
+    <button id="downloadAll" style="display:none">Download All PNGs</button>
+    <div id="status"></div>
+    <div id="previews"></div>
+
+    <!-- We need a hidden canvas for the game engine -->
+    <canvas id="gameCanvas" style="display:none"></canvas>
+
+    <!-- Load game scripts in order -->
+    <script src="js/map.js?v=6"></script>
+    <script src="js/unit.js?v=12"></script>
+    <script src="js/visibility.js?v=6"></script>
+    <script src="js/combat.js?v=8"></script>
+    <script src="js/ai.js?v=6"></script>
+    <script src="js/army.js?v=12"></script>
+    <script src="js/campaign.js?v=12"></script>
+    <script src="js/renderer.js?v=12"></script>
+    <script src="js/input.js?v=7"></script>
+    <!-- Do NOT load main.js to avoid auto-init -->
+
+    <script>
+    const MAPS = [
+        { type: 'grasslands', seed: 42, name: 'grasslands' },
+        { type: 'river', seed: 77, name: 'river' },
+        { type: 'hillfort', seed: 55, name: 'hillfort' },
+        { type: 'dense_forest', seed: 33, name: 'dense_forest' },
+        { type: 'rolling_hills', seed: 91, name: 'rolling_hills' },
+        { type: 'narrow_pass', seed: 61, name: 'narrow_pass' },
+        { type: 'twin_rivers', seed: 44, name: 'twin_rivers' },
+        { type: 'forest_river', seed: 28, name: 'forest_river' },
+        { type: 'scattered_rocks', seed: 73, name: 'scattered_rocks' },
+        { type: 'roman_road', seed: 85, name: 'roman_road' },
+        { type: 'ambush', seed: 37, name: 'ambush' }
+    ];
+
+    const generated = []; // { name, canvas }
+
+    function generatePreview(m) {
+        // Save current map state
+        const savedSeed = GameMap._seed;
+        const savedPerm = GameMap._perm;
+        const savedHeight = GameMap.heightData;
+        const savedCols = GameMap._cols;
+        const savedRows = GameMap._rows;
+        const savedForests = GameMap.forests;
+        const savedHills = GameMap.hills;
+        const savedRiver = GameMap.river;
+        const savedBridges = GameMap.bridges;
+        const savedMapType = GameMap.mapType;
+        const savedCanvas = GameMap.canvas;
+        const savedDitches = GameMap.ditches;
+        const savedTwinRiver = GameMap._twinRiverData;
+        const savedRoads = GameMap.roads;
+        const savedWidth = GameMap.width;
+        const savedHeight2 = GameMap.height;
+        const savedGridSize = GameMap.gridSize;
+
+        // Render at preview resolution
+        GameMap.width = 480;
+        GameMap.height = 270;
+        GameMap.gridSize = 4;
+
+        GameMap._seed = m.seed;
+        GameMap.mapType = m.type;
+        GameMap._generatePermutation();
+        GameMap.heightData = GameMap._generateHeightmap();
+        GameMap.river = null;
+        GameMap.bridges = [];
+        GameMap.ditches = [];
+        GameMap.roads = [];
+        GameMap._twinRiverData = null;
+        GameMap._pendingHills = [];
+        GameMap._roadMask = null;
+
+        if (m.type === 'grasslands' || m.type === 'river') {
+            GameMap._precomputeHillPositions();
+        }
+        if (m.type === 'roman_road') {
+            GameMap._generateRomanRoad();
+        }
+        if (m.type === 'grasslands') {
+            GameMap._generateGrasslandsRoad();
+        }
+        if (m.type === 'river' || m.type === 'forest_river') {
+            GameMap._generateRiver();
+            GameMap._generateBridges();
+        }
+        if (m.type === 'river') {
+            GameMap._generateRiverCrossingRoad();
+        } else if (m.type === 'twin_rivers') {
+            GameMap._generateTwinRiversRoad();
+        } else if (m.type === 'narrow_pass') {
+            GameMap._generateNarrowPassRoad();
+        } else if (m.type === 'dense_forest') {
+            GameMap._generateDenseForestRoad();
+        }
+        if (GameMap.roads.length > 0) {
+            GameMap._buildRoadMask();
+        }
+        if (m.type === 'hillfort') {
+            GameMap._generateHillfortTerrain();
+        } else if (m.type === 'dense_forest') {
+            GameMap._generateDenseForestTerrain();
+        } else if (m.type === 'rolling_hills') {
+            GameMap._generateRollingHillsTerrain();
+        } else if (m.type === 'narrow_pass') {
+            GameMap._generateNarrowPassTerrain();
+        } else if (m.type === 'scattered_rocks') {
+            GameMap._generateScatteredRocksTerrain();
+        } else if (m.type === 'roman_road') {
+            GameMap._generateRomanRoadTerrain();
+        } else if (m.type === 'ambush') {
+            GameMap._generateAmbushTerrain();
+        } else if (m.type === 'twin_rivers') {
+            GameMap._generateTwinRiversTerrain();
+            GameMap._generateTwinRivers();
+        } else if (m.type === 'forest_river') {
+            GameMap._generateForestRiverTerrain();
+        } else {
+            GameMap._generateTerrainFeatures();
+        }
+        GameMap._applyHillsToHeightmap();
+        GameMap.peaks = [];
+
+        GameMap.canvas = document.createElement('canvas');
+        GameMap.canvas.width = GameMap.width;
+        GameMap.canvas.height = GameMap.height;
+        GameMap._renderMap();
+
+        const result = GameMap.canvas;
+
+        // Restore
+        GameMap._seed = savedSeed;
+        GameMap._perm = savedPerm;
+        GameMap.heightData = savedHeight;
+        GameMap._cols = savedCols;
+        GameMap._rows = savedRows;
+        GameMap.forests = savedForests;
+        GameMap.hills = savedHills;
+        GameMap.river = savedRiver;
+        GameMap.bridges = savedBridges;
+        GameMap.mapType = savedMapType;
+        GameMap.canvas = savedCanvas;
+        GameMap.ditches = savedDitches;
+        GameMap._twinRiverData = savedTwinRiver;
+        GameMap.roads = savedRoads;
+        GameMap.width = savedWidth;
+        GameMap.height = savedHeight2;
+        GameMap.gridSize = savedGridSize;
+
+        return result;
+    }
+
+    document.getElementById('btnGenerate').addEventListener('click', () => {
+        const status = document.getElementById('status');
+        const container = document.getElementById('previews');
+        container.innerHTML = '';
+        generated.length = 0;
+
+        let idx = 0;
+        function next() {
+            if (idx >= MAPS.length) {
+                status.textContent = 'All ' + MAPS.length + ' previews generated. Click "Download All" to save.';
+                document.getElementById('downloadAll').style.display = '';
+                return;
+            }
+            const m = MAPS[idx++];
+            status.textContent = 'Generating ' + m.name + ' (' + idx + '/' + MAPS.length + ')...';
+
+            const canvas = generatePreview(m);
+            generated.push({ name: m.name, canvas });
+
+            const row = document.createElement('div');
+            row.className = 'preview-row';
+            row.appendChild(canvas);
+
+            const label = document.createElement('span');
+            label.textContent = m.name + '.png';
+            row.appendChild(label);
+
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = m.name + '.png';
+            link.textContent = 'Download';
+            row.appendChild(link);
+
+            container.appendChild(row);
+            setTimeout(next, 0);
+        }
+        next();
+    });
+
+    document.getElementById('downloadAll').addEventListener('click', () => {
+        generated.forEach((g, i) => {
+            setTimeout(() => {
+                const link = document.createElement('a');
+                link.href = g.canvas.toDataURL('image/png');
+                link.download = g.name + '.png';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }, i * 200); // stagger downloads
+        });
+    });
+    </script>
+</body>
+</html>
