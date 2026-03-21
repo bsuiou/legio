@@ -285,13 +285,13 @@ const Combat = {
                 const dist = Math.sqrt(distSq);
                 if (dist < 0.5) continue;
                 const penetration = touchDist - dist;
-                // Dead zone: ignore overlaps smaller than 2px to prevent micro-jitter
-                if (penetration < 2) continue;
+                // Dead zone: ignore overlaps smaller than 1px to prevent micro-jitter
+                if (penetration < 1) continue;
 
                 const nx = dx / dist;
                 const ny = dy / dist;
-                // Only push enough to reach the 2px dead zone, not fully apart
-                const push = (penetration - 2) * 0.15;
+                // Push apart more aggressively to prevent units getting stuck on each other
+                const push = (penetration - 1) * 0.35;
                 const aLocked = a.inCombat;
                 const bLocked = b.inCombat;
                 if (aLocked && bLocked) continue;

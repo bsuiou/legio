@@ -344,15 +344,46 @@ class Unit {
             const desiredAngle = Math.atan2(dy, dx);
             const angleDiff = this._turnToward(desiredAngle, dt);
 
-            // Move forward (only if roughly facing the right direction)
-            if (Math.abs(angleDiff) < Math.PI * 0.6) {
+            // Move forward — scale speed by facing accuracy instead of hard cutoff
+            // Units still move (slowly) even when turning, preventing deadlocks
+            const absDiff = Math.abs(angleDiff);
+            if (absDiff < Math.PI * 0.85) {
+                const facingFactor = absDiff < Math.PI * 0.3 ? 1.0 : Math.max(0.2, 1.0 - (absDiff - Math.PI * 0.3) / (Math.PI * 0.55));
                 const targetSpeed = this.getSpeed();
                 // Smooth speed transitions to avoid jitter from terrain changes
                 if (this._smoothSpeed === undefined) this._smoothSpeed = targetSpeed;
                 this._smoothSpeed += (targetSpeed - this._smoothSpeed) * Math.min(1, dt * 8);
-                const speed = this._smoothSpeed;
-                const moveX = Math.cos(this.angle) * speed * dt;
-                const moveY = Math.sin(this.angle) * speed * dt;
+                const speed = this._smoothSpeed * facingFactor;
+                let moveX = Math.cos(this.angle) * speed * dt;
+                let moveY = Math.sin(this.angle) * speed * dt;
+
+                // Local avoidance: steer around nearby friendly units blocking the path
+                if (!this.inCombat && this.targetX !== null) {
+                    const friendlies = this.team === 'player' ? Army.playerUnits : AI.units;
+                    const cr = this.getCollisionRadius();
+                    for (const other of friendlies) {
+                        if (other === this || !other.alive) continue;
+                        const odx = other.x - this.x;
+                        const ody = other.y - this.y;
+                        const oDist = Math.sqrt(odx * odx + ody * ody);
+                        const avoidDist = cr + other.getCollisionRadius() + 8;
+                        if (oDist >= avoidDist || oDist < 1) continue;
+                        // Only avoid if the other unit is roughly ahead of us
+                        const dot = moveX * odx + moveY * ody;
+                        if (dot <= 0) continue; // behind us, ignore
+                        // Steer perpendicular — pick the side with more space
+                        const perpX = -ody / oDist;
+                        const perpY = odx / oDist;
+                        const avoidStrength = (avoidDist - oDist) / avoidDist * speed * dt * 0.6;
+                        // Pick side: which perpendicular direction moves us closer to our target?
+                        const toTargetX = this.targetX - this.x;
+                        const toTargetY = this.targetY - this.y;
+                        const side = (perpX * toTargetX + perpY * toTargetY) > 0 ? 1 : -1;
+                        moveX += perpX * side * avoidStrength;
+                        moveY += perpY * side * avoidStrength;
+                    }
+                }
+
                 const newX = this.x + moveX;
                 const newY = this.y + moveY;
 
