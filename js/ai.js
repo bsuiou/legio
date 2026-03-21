@@ -443,11 +443,21 @@ const AI = {
     },
 
     // Battle AI - formation-based + terrain awareness + fog of war
+    // Hunt timer — when no enemies visible, AI units start searching the map
+    _huntTimer: 0,
+
     updateBattle(playerUnits, dt) {
         if (Network.isMultiplayer) return; // human controls enemy side
         // Check if any player units are visible to the AI
         const visibleEnemies = playerUnits.filter(e => e.alive && Visibility.isVisible(e.x, e.y, 'enemy'));
         const hasVisibleTargets = visibleEnemies.length > 0;
+
+        // Track how long AI has had no visible targets
+        if (hasVisibleTargets) {
+            this._huntTimer = 0;
+        } else {
+            this._huntTimer += dt;
+        }
 
         // If scouts spotted enemies, convert them back to normal AI units
         if (hasVisibleTargets) {
@@ -560,10 +570,14 @@ const AI = {
                     // Face target
                     unit._turnToward(Math.atan2(dy, dx), dt);
                 } else if (!hasVisibleTargets) {
-                    // No targets — stay behind infantry formation center
+                    // No targets — stay behind infantry or hunt
                     if (unit.targetX === null) {
-                        const fc = this._getFormationCenter();
-                        this._routeTo(unit, fc.x + 80, fc.y + (Math.random() - 0.5) * 60);
+                        if (this._huntTimer > 5) {
+                            this._routeTo(unit, this._huntX(unit), this._huntY(unit));
+                        } else {
+                            const fc = this._getFormationCenter();
+                            this._routeTo(unit, fc.x + 80, fc.y + (Math.random() - 0.5) * 60);
+                        }
                     }
                 }
 
@@ -587,13 +601,16 @@ const AI = {
                         this._routeTo(unit, bestTarget.x, bestTarget.y);
                     }
                 } else if (!hasVisibleTargets) {
-                    // No targets — hold flanking positions while creeping forward
+                    // No targets — cavalry hunts aggressively (fastest searchers)
                     if (unit.targetX === null) {
-                        const fc = this._getFormationCenter();
-                        const aboveCenter = unit.y < GameMap.height / 2;
-                        const flankY = aboveCenter ? Math.max(60, fc.y - 250) : Math.min(GameMap.height - 60, fc.y + 250);
-                        const creepX = fc.x - 50;
-                        this._routeTo(unit, creepX, flankY);
+                        if (this._huntTimer > 3) {
+                            this._routeTo(unit, this._huntX(unit), this._huntY(unit));
+                        } else {
+                            const fc = this._getFormationCenter();
+                            const aboveCenter = unit.y < GameMap.height / 2;
+                            const flankY = aboveCenter ? Math.max(60, fc.y - 250) : Math.min(GameMap.height - 60, fc.y + 250);
+                            this._routeTo(unit, fc.x - 50, flankY);
+                        }
                     }
                 }
 
@@ -624,15 +641,39 @@ const AI = {
                         this._routeTo(unit, bestTarget.x, bestTarget.y);
                     }
                 } else if (!hasVisibleTargets) {
-                    // No targets — advance as front line toward map center
+                    // No targets — advance then hunt
                     if (unit.targetX === null) {
-                        const creepX = GameMap.width * (0.4 + Math.random() * 0.15);
-                        const creepY = unit.y + (Math.random() - 0.5) * 80;
-                        this._routeTo(unit, creepX, Math.max(60, Math.min(GameMap.height - 60, creepY)));
+                        if (this._huntTimer > 5) {
+                            this._routeTo(unit, this._huntX(unit), this._huntY(unit));
+                        } else {
+                            const creepX = GameMap.width * (0.4 + Math.random() * 0.15);
+                            const creepY = unit.y + (Math.random() - 0.5) * 80;
+                            this._routeTo(unit, creepX, Math.max(60, Math.min(GameMap.height - 60, creepY)));
+                        }
                     }
                 }
             }
         }
+    },
+
+    // Hunt mode: generate a random search position spread across the map
+    // Units spread out to cover different areas
+    _huntX(unit) {
+        // Divide map into zones and pick one the unit isn't already in
+        const zoneW = GameMap.width / 3;
+        const currentZone = Math.floor(unit.x / zoneW);
+        // Pick a different zone
+        let zone = Math.floor(Math.random() * 3);
+        if (zone === currentZone) zone = (zone + 1) % 3;
+        return zone * zoneW + Math.random() * zoneW;
+    },
+
+    _huntY(unit) {
+        const zoneH = GameMap.height / 3;
+        const currentZone = Math.floor(unit.y / zoneH);
+        let zone = Math.floor(Math.random() * 3);
+        if (zone === currentZone) zone = (zone + 1) % 3;
+        return Math.max(50, Math.min(GameMap.height - 50, zone * zoneH + Math.random() * zoneH));
     },
 
     // Find nearest alive friendly infantry to a given unit
