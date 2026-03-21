@@ -39,7 +39,7 @@ const Network = {
     _prevState: null,
     _currState: null,
     _stateTime: 0,
-    _renderDelay: 80, // ms behind real-time
+    _renderDelay: 50, // ms behind real-time
 
     // --- Initialization ---
 
@@ -285,7 +285,7 @@ const Network = {
 
     startBroadcasting(getStateFn) {
         if (!this.isHost) return;
-        // Broadcast at ~12 Hz
+        // Broadcast at ~20 Hz
         this._broadcastInterval = setInterval(() => {
             if (!this.channel || !this.peerConnected) return;
             const state = getStateFn();
@@ -294,7 +294,7 @@ const Network = {
                 event: 'state',
                 payload: state
             });
-        }, 83); // ~12 Hz
+        }, 50); // ~20 Hz
     },
 
     stopBroadcasting() {
