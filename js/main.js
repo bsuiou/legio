@@ -655,6 +655,7 @@ const Game = {
                 ar: Network.compressArrows(Renderer.arrows),
                 bt: this.battleTime,
                 ev: this._battleEvents,
+                sp: this.gameSpeed,
             };
         });
     },
@@ -687,9 +688,17 @@ const Game = {
         applyDiscrete(AI.units, state.hostUnits);
         applyDiscrete(Army.playerUnits, state.guestUnits);
 
-        // Sync arrows and battle time
+        // Sync arrows, battle time, and game speed
         this.battleTime = state.battleTime || 0;
         Renderer.battleTimer = this.battleTime;
+        if (state.sp !== undefined && this.gameSpeed !== state.sp) {
+            this.gameSpeed = state.sp;
+            const btn = document.getElementById('btnSpeed');
+            if (btn) {
+                const idx = this._speedSteps.indexOf(this.gameSpeed);
+                btn.textContent = idx >= 0 ? this._speedLabels[idx] : this._speedLabels[1];
+            }
+        }
         const timerEl = document.getElementById('battleTimer');
         if (timerEl) {
             const m = Math.floor(this.battleTime / 60);
@@ -921,6 +930,8 @@ const Game = {
     },
 
     cycleSpeed() {
+        // Guest can't change speed — host controls it
+        if (Network.isMultiplayer && !Network.isHost) return;
         const idx = this._speedSteps.indexOf(this.gameSpeed);
         const next = (idx + 1) % this._speedSteps.length;
         this.gameSpeed = this._speedSteps[next];
