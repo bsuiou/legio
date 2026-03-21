@@ -551,6 +551,19 @@ const GameMap = {
                     overlaps = true; break;
                 }
             }
+            // Check overlap with roads — hill should not sit on a road
+            if (!overlaps) {
+                for (const road of this.roads) {
+                    const margin = road.width * 0.5 + size * 0.4 + 20;
+                    for (const pt of road.points) {
+                        const dx = candidate.x - pt.x, dy = candidate.y - pt.y;
+                        if (dx * dx + dy * dy < margin * margin) {
+                            overlaps = true; break;
+                        }
+                    }
+                    if (overlaps) break;
+                }
+            }
             if (!overlaps) {
                 this.hills.push(candidate);
                 return true;

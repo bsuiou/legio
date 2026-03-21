@@ -164,6 +164,7 @@ const Campaign = {
         this.veteranRoster = [];
         this._nextVetId = 0;
         this._veteranUpgrades = {};
+        this._battleResultProcessed = false;
         this._resetBattleBuffs();
         Game.setState('CAMPAIGN_MAP');
     },
@@ -529,6 +530,7 @@ const Campaign = {
         Game.selectedMap = node.map;
         Army.budget = node.pBudget;
         Army.remaining = node.pBudget;
+        // Show shop before battle
         Game.setState('CAMPAIGN_SHOP');
     },
 
@@ -794,8 +796,13 @@ const Campaign = {
     },
 
     onBattleResult(victory) {
+        // Guard against being called twice (e.g. from rapid setState('RESULT'))
+        if (this._battleResultProcessed) return;
+        this._battleResultProcessed = true;
+
         if (victory) {
-            // Earnings: base 100 + 20% per battle number + 0.05 per surviving strength
+            // Earnings: base 100 + 20% per completed battle + 0.05 per surviving strength
+            // Battle 1 = 100, Battle 2 = 120, Battle 3 = 140, etc.
             const battleNum = this.getCompletedBattleCount();
             const basePay = Math.round(100 * (1 + 0.20 * battleNum));
             const aliveStrength = Army.playerUnits
@@ -895,7 +902,7 @@ const Campaign = {
         } else if (victory) {
             title = 'Victory!';
             titleClass = 'victory';
-            buttonHTML = `<button class="menu-btn" onclick="Game.setState('CAMPAIGN_MAP')">Continue Campaign</button>`;
+            buttonHTML = `<button class="menu-btn" onclick="Game.setState('CAMPAIGN_MAP')">View Campaign Map</button>`;
         } else {
             title = 'Defeat \u2014 Campaign Over';
             titleClass = 'defeat';

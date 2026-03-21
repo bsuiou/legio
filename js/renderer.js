@@ -745,6 +745,13 @@ const Renderer = {
             lines.push('Mercenary');
         }
 
+        // Campaign battle buffs
+        if (Campaign.active && unit.team === 'player') {
+            if (Campaign._battleBuffs.fireArrows > 0 && unit.type === UnitType.ARCHERS) lines.push('\u{1F525} Fire Arrows +20%');
+            if (Campaign._battleBuffs.cavalrySpeed > 0 && unit.category === 'cavalry') lines.push('\u{1F40E} War Horses +15% speed');
+            if (Campaign._battleBuffs.allDamage > 0) lines.push(`\u{1F941} War Drums +${Math.round(Campaign._battleBuffs.allDamage * 100)}% dmg`);
+        }
+
         // Terrain info
         const forestOvl = GameMap.getForestOverlap(unit.x, unit.y, unit.getCollisionRadius());
         if (forestOvl > 0.05) lines.push(`Forest: ${Math.round(forestOvl * 100)}%`);

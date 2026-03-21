@@ -96,6 +96,7 @@ const Game = {
 
             case 'BATTLE':
                 document.getElementById('battleUI').classList.remove('hidden');
+                if (Campaign.active) Campaign._battleResultProcessed = false;
                 this._assignSubNames();
                 this._buildBattleUI();
                 this.battleTime = 0;
