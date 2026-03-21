@@ -381,11 +381,31 @@ const Game = {
             const label = this._shortLabel(u.type);
             const sub = u.subName ? ` ${u.subName}` : '';
             const sym = unitSymbolHTML(u.type, u.size, true);
+            // Badge indicators for veterans/mercs/upgrades
+            let badges = '';
+            let slotClass = 'hotbar-slot';
+            if (u._veteranId) {
+                slotClass += ' veteran';
+                badges += '<span class="badge-vet">\u2605</span>';
+                const dmg = u._vetDamageUps || 0;
+                const arm = u._vetArmorUps || 0;
+                if (dmg > 0) badges += `<span class="badge-dmg">\u2694${dmg > 1 ? '\u00d7' + dmg : ''}</span>`;
+                if (arm > 0) badges += `<span class="badge-arm">\u{1F6E1}${arm > 1 ? '\u00d7' + arm : ''}</span>`;
+            } else if (u._isMercenary) {
+                slotClass += ' mercenary';
+                badges += '<span class="badge-merc">M</span>';
+            }
+            // Campaign buffs
+            if (Campaign.active) {
+                if (Campaign._battleBuffs.fireArrows > 0 && u.type === UnitType.ARCHERS) badges += '<span class="badge-fire">\u{1F525}</span>';
+                if (Campaign._battleBuffs.cavalrySpeed > 0 && u.category === 'cavalry') badges += '<span class="badge-horse">\u{1F40E}</span>';
+            }
             hotbarHTML += `
-                <div class="hotbar-slot" data-slot="${i}">
+                <div class="${slotClass}" data-slot="${i}">
                     <span class="slot-key">${i + 1}</span>
                     <div class="slot-sym">${sym}</div>
                     <span class="slot-label">${label}${sub}</span>
+                    ${badges ? `<div class="slot-badges">${badges}</div>` : ''}
                     <div class="slot-hp"><div class="slot-hp-fill" style="width:100%"></div></div>
                 </div>`;
         });

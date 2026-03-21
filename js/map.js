@@ -38,8 +38,8 @@ const GameMap = {
         this._twinRiverData = null;
         this._pendingHills = [];
         this._roadMask = null;
-        // Pre-compute hill positions for maps with random hills + roads
-        if (this.mapType === 'grasslands' || this.mapType === 'river') {
+        // Pre-compute hill positions for grasslands (before road, so road steers around hills)
+        if (this.mapType === 'grasslands') {
             this._precomputeHillPositions();
         }
         if (this.mapType === 'roman_road') {
@@ -54,6 +54,10 @@ const GameMap = {
             this._generateBridges();
         } else if (this.mapType === 'twin_rivers') {
             this._generateTwinRivers();
+        }
+        // Pre-compute hill positions for river (AFTER river exists, so hills avoid river)
+        if (this.mapType === 'river') {
+            this._precomputeHillPositions();
         }
         // Roads that depend on rivers/bridges being generated first
         if (this.mapType === 'river') {
@@ -564,6 +568,19 @@ const GameMap = {
                     if (overlaps) break;
                 }
             }
+            // Check overlap with river — use actual polygon radius
+            if (!overlaps && this._isNearRiver(candidate.x, candidate.y, candidate.radius + 20)) {
+                overlaps = true;
+            }
+            // Check proximity to bridges — keep 150px clearance from actual edge
+            if (!overlaps) {
+                for (const b of this.bridges) {
+                    const dx = candidate.x - b.x, dy = candidate.y - b.y;
+                    if (dx * dx + dy * dy < (candidate.radius + 150) * (candidate.radius + 150)) {
+                        overlaps = true; break;
+                    }
+                }
+            }
             if (!overlaps) {
                 this.hills.push(candidate);
                 return true;
@@ -579,20 +596,30 @@ const GameMap = {
         const forestRadii = this._splitAreaBudget(totalForestArea, numForests, this._seed * 0.11);
         const clampR = (r, min, max) => Math.max(min, Math.min(max, r));
 
-        // Generate forests — balanced left/right, avoiding the river
+        // Generate forests — balanced left/right, avoiding river and bridges
         this.forests = [];
         for (let i = 0; i < numForests; i++) {
             const onLeft = (i % 2 === 0);
             const halfMin = onLeft ? 150 : this.width * 0.5;
             const halfMax = onLeft ? this.width * 0.5 : this.width - 150;
             const fr = clampR(forestRadii[i], 60, 200);
-            let fx, fy, attempts = 0;
+            let fx, fy, attempts = 0, valid = false;
+            let rng = this._seed * 16807 + i * 12345;
             do {
-                fx = halfMin + (this._noise(i * 5.3 + attempts * 0.7, this._seed * 0.03) + 1) * 0.5 * (halfMax - halfMin);
-                fy = 120 + (this._noise(this._seed * 0.03, i * 5.3 + attempts * 0.7) + 1) * 0.5 * (this.height - 240);
+                rng = (rng * 16807 + 1) % 2147483647;
+                fx = halfMin + (rng / 2147483647) * (halfMax - halfMin);
+                rng = (rng * 16807 + 1) % 2147483647;
+                fy = 120 + (rng / 2147483647) * (this.height - 240);
                 attempts++;
-            } while (this._isNearRiver(fx, fy, fr + 40) && attempts < 10);
-            this.forests.push(this._createFeature(fx, fy, fr, undefined, fx * 0.01 + fy * 0.01 + fr));
+                valid = !this._isNearRiver(fx, fy, fr + 20) && !this._isNearBridge(fx, fy, fr + 80);
+            } while (!valid && attempts < 50);
+            if (valid) {
+                const feature = this._createFeature(fx, fy, fr, undefined, fx * 0.01 + fy * 0.01 + fr);
+                // Re-check with actual polygon radius (can be larger than requested fr)
+                if (!this._isNearRiver(fx, fy, feature.radius + 20) && !this._isNearBridge(fx, fy, feature.radius + 80)) {
+                    this.forests.push(feature);
+                }
+            }
         }
 
         // Generate discrete hills — use pre-computed positions if available
@@ -606,18 +633,22 @@ const GameMap = {
             let hx = ph.x, hy = ph.y;
             const elev = 0.32 + Math.abs(this._noise(i * 1.9, i * 3.1)) * 0.20;
 
-            // Push away from forests
+            // Push away from forests, but don't push into river or near bridge
             let hxAdj = hx, hyAdj = hy;
             for (const f of this.forests) {
                 const dx = hxAdj - f.x, dy = hyAdj - f.y;
                 const d = Math.sqrt(dx * dx + dy * dy);
                 const minDist = hr + f.radius + 40;
                 if (d < minDist && d > 1) {
-                    hxAdj = f.x + (dx / d) * minDist;
-                    hyAdj = f.y + (dy / d) * minDist;
+                    const newX = f.x + (dx / d) * minDist;
+                    const newY = f.y + (dy / d) * minDist;
+                    if (!this._isNearRiver(newX, newY, hr + 20) && !this._isNearBridge(newX, newY, hr + 150)) {
+                        hxAdj = newX;
+                        hyAdj = newY;
+                    }
                 }
             }
-            this._tryPlaceHill(hxAdj, hyAdj, hr, elev, i * 3.7 + this._seed * 0.19, 8);
+            this._tryPlaceHill(hxAdj, hyAdj, hr, elev, i * 3.7 + this._seed * 0.19, 15);
         }
     },
 
@@ -1897,10 +1928,19 @@ const GameMap = {
         const pts = this.river.points;
         const hw = this.river.width / 2 + margin;
         const hw2 = hw * hw;
-        // Quick bounding check — only test nearby points
-        for (let i = 0; i < pts.length; i += 2) {
+        for (let i = 0; i < pts.length; i++) {
             const dx = px - pts[i].x, dy = py - pts[i].y;
             if (dx * dx + dy * dy < hw2) return true;
+        }
+        return false;
+    },
+
+    _isNearBridge(px, py, margin) {
+        if (!this.bridges || this.bridges.length === 0) return false;
+        const m2 = margin * margin;
+        for (const b of this.bridges) {
+            const dx = px - b.x, dy = py - b.y;
+            if (dx * dx + dy * dy < m2) return true;
         }
         return false;
     },
@@ -2069,13 +2109,19 @@ const GameMap = {
             const halfMin = onLeft ? 200 : this.width * 0.5;
             const halfMax = onLeft ? this.width * 0.5 : this.width - 200;
             const hr = clampR(hillRadii[i], 70, 200);
-            let hx, hy, attempts = 0;
+            let hx, hy, attempts = 0, valid = false;
+            let rng = this._seed * 16807 + i * 54321;
             do {
-                hx = halfMin + (this._noise(i * 7.1 + attempts * 0.7, this._seed * 0.05) + 1) * 0.5 * (halfMax - halfMin);
-                hy = 150 + (this._noise(this._seed * 0.05, i * 7.1 + attempts * 0.7) + 1) * 0.5 * (this.height - 300);
+                rng = (rng * 16807 + 1) % 2147483647;
+                hx = halfMin + (rng / 2147483647) * (halfMax - halfMin);
+                rng = (rng * 16807 + 1) % 2147483647;
+                hy = 150 + (rng / 2147483647) * (this.height - 300);
                 attempts++;
-            } while (this._isNearRiver(hx, hy, hr + 40) && attempts < 10);
-            this._pendingHills.push({ x: hx, y: hy, radius: hr, index: i });
+                valid = !this._isNearRiver(hx, hy, hr + 20) && !this._isNearBridge(hx, hy, hr + 150);
+            } while (!valid && attempts < 50);
+            if (valid) {
+                this._pendingHills.push({ x: hx, y: hy, radius: hr, index: i });
+            }
         }
     },
 
@@ -2155,14 +2201,18 @@ const GameMap = {
             ry += (bridge.y - ry) * bridgeInfluence * 0.15;
             const drift = this._noise(rx * 0.003 + this._seed * 0.25, ry * 0.004) * 3;
             ry += drift;
-            // Steer around pre-computed hills (multiple passes for convergence)
-            for (let pass = 0; pass < 3; pass++) {
-                for (const ph of this._pendingHills) {
-                    const dx = rx - ph.x, dy = ry - ph.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    const avoidR = ph.radius + roadWidth + 20;
-                    if (dist < avoidR && dist > 1) {
-                        ry += (dy / dist) * (avoidR - dist) * 0.8;
+            // Steer around pre-computed hills — but suppress near bridge so road reaches it
+            const distToBridge = Math.sqrt((rx - bridge.x) * (rx - bridge.x) + (ry - bridge.y) * (ry - bridge.y));
+            const hillAvoidStrength = distToBridge < 200 ? 0 : distToBridge < 400 ? (distToBridge - 200) / 200 : 1;
+            if (hillAvoidStrength > 0) {
+                for (let pass = 0; pass < 3; pass++) {
+                    for (const ph of this._pendingHills) {
+                        const dx = rx - ph.x, dy = ry - ph.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const avoidR = ph.radius + roadWidth + 20;
+                        if (dist < avoidR && dist > 1) {
+                            ry += (dy / dist) * (avoidR - dist) * 0.8 * hillAvoidStrength;
+                        }
                     }
                 }
             }

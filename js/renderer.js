@@ -251,6 +251,48 @@ const Renderer = {
             ctx.restore();
         }
 
+        // Veteran / mercenary / upgrade indicators (above unit, no rotation)
+        if (isPlayer && (unit._veteranId || unit._isMercenary)) {
+            ctx.save();
+            ctx.scale(this.scale, this.scale);
+            const rawOff = sc.shape === 'circle' ? sc.radius : sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
+            const indicY = unit.y - rawOff * sizeScale - (unit.hp < unit.maxHp ? 18 : 10);
+            const indicX = unit.x;
+
+            ctx.font = 'bold 9px Georgia';
+            ctx.textAlign = 'center';
+
+            if (unit._veteranId) {
+                // Gold star for veteran
+                ctx.fillStyle = '#e0c060';
+                ctx.fillText('\u2605', indicX, indicY);
+
+                // Upgrade pips to the right of the star
+                const dmg = unit._vetDamageUps || 0;
+                const arm = unit._vetArmorUps || 0;
+                let pipX = indicX + 7;
+                for (let p = 0; p < dmg; p++) {
+                    ctx.fillStyle = '#d04030';
+                    ctx.beginPath();
+                    ctx.arc(pipX, indicY - 3, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    pipX += 6;
+                }
+                for (let p = 0; p < arm; p++) {
+                    ctx.fillStyle = '#4080d0';
+                    ctx.beginPath();
+                    ctx.arc(pipX, indicY - 3, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    pipX += 6;
+                }
+            } else if (unit._isMercenary) {
+                // Olive M for mercenary
+                ctx.fillStyle = '#d4a040';
+                ctx.fillText('M', indicX, indicY);
+            }
+            ctx.restore();
+        }
+
         // Facing threat indicators — one arc per flank/rear attacker
         if (unit.inCombat && unit.facingThreats.length > 0) {
             ctx.save();
