@@ -117,9 +117,9 @@ const Game = {
                 document.getElementById('battleUI').classList.remove('hidden');
                 if (Campaign.active) Campaign._battleResultProcessed = false;
                 this._assignSubNames();
-                this._buildBattleUI();
                 this.battleTime = 0;
                 this.gameSpeed = 1;
+                this._buildBattleUI();
                 Renderer.arrows = [];
                 Renderer.deathMarkers = [];
                 Renderer.battleLog = [];
@@ -652,7 +652,7 @@ const Game = {
             return {
                 hu: Network.compressUnits(Army.playerUnits),
                 gu: Network.compressUnits(AI.units),
-                ar: Network.compressArrows(Renderer.arrows),
+                ar: Network.compressArrows(this._frameArrows || []),
                 bt: this.battleTime,
                 ev: this._battleEvents,
                 sp: this.gameSpeed,
@@ -688,7 +688,17 @@ const Game = {
         applyDiscrete(AI.units, state.hostUnits);
         applyDiscrete(Army.playerUnits, state.guestUnits);
 
-        // Sync arrows, battle time, and game speed
+        // Sync arrows — decompress into format drawArrows expects
+        if (state.arrows && state.arrows.length > 0) {
+            this._frameArrows = state.arrows.map(a => ({
+                from: { x: a.fx, y: a.fy },
+                to: { x: a.tx, y: a.ty },
+            }));
+        } else {
+            this._frameArrows = [];
+        }
+
+        // Sync battle time, and game speed
         this.battleTime = state.battleTime || 0;
         Renderer.battleTimer = this.battleTime;
         if (state.sp !== undefined && this.gameSpeed !== state.sp) {
@@ -1403,6 +1413,7 @@ const Game = {
                 } else {
                     // Host or single-player: run physics
                     this._physicsAccum += frameDt * this.gameSpeed;
+                    this._frameArrows = [];
                     while (this._physicsAccum >= this._PHYSICS_DT && this.state === 'BATTLE') {
                         this._updateBattle(this._PHYSICS_DT);
                         this._physicsAccum -= this._PHYSICS_DT;
@@ -1471,7 +1482,11 @@ const Game = {
         AI.updateBattle(Army.playerUnits, dt);
 
         // Combat resolution
-        this._lastArrows = Combat.updateAll(Army.playerUnits, AI.units, dt);
+        const tickArrows = Combat.updateAll(Army.playerUnits, AI.units, dt);
+        if (tickArrows.length > 0) {
+            if (!this._frameArrows) this._frameArrows = [];
+            for (const a of tickArrows) this._frameArrows.push(a);
+        }
 
         // Detect newly dead units and add death markers
         const allUnits = [...Army.playerUnits, ...AI.units];
@@ -1555,7 +1570,7 @@ const Game = {
         }
 
         // Draw arrows
-        Renderer.drawArrows(this._lastArrows || [], dt);
+        Renderer.drawArrows(this._frameArrows || [], dt);
 
         // Draw selection box
         const box = Input.getSelectionBox();

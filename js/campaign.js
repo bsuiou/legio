@@ -210,17 +210,22 @@ const Campaign = {
             <div class="shop-items-grid">
                 ${buffItems.map(item => {
                     let bought = false;
+                    let stacks = 0;
                     if (item.once) {
                         if (item.id === 'scout_report') bought = this._battleBuffs.scoutReport;
                         if (item.id === 'fire_arrows') bought = this._battleBuffs.fireArrows > 0;
                         if (item.id === 'cavalry_speed') bought = this._battleBuffs.cavalrySpeed > 0;
                     }
+                    if (item.repeatable) {
+                        if (item.id === 'all_damage') stacks = Math.round(this._battleBuffs.allDamage / 0.05);
+                    }
                     const canBuy = this.coins >= item.cost && !bought;
-                    return `<div class="shop-item ${bought ? 'bought' : ''} ${!canBuy && !bought ? 'too-expensive' : ''}" onclick="${canBuy ? `Campaign._buyBuff('${item.id}')` : ''}">
+                    const costLabel = bought ? '\u2714 Bought' : (stacks > 0 ? `\u2714 \u00d7${stacks} (${item.cost} \u{1FA99} more)` : item.cost + ' \u{1FA99}');
+                    return `<div class="shop-item ${bought ? 'bought' : ''} ${stacks > 0 ? 'bought-stacked' : ''} ${!canBuy && !bought ? 'too-expensive' : ''}" onclick="${canBuy ? `Campaign._buyBuff('${item.id}')` : ''}">
                         <span class="shop-item-icon">${item.icon}</span>
                         <span class="shop-item-label">${item.label}</span>
-                        <span class="shop-item-desc">${item.desc}</span>
-                        <span class="shop-item-cost">${bought ? '\u2714 Bought' : item.cost + ' \u{1FA99}'}</span>
+                        <span class="shop-item-desc">${item.desc}${stacks > 0 ? ' (+' + (stacks * 5) + '% total)' : ''}</span>
+                        <span class="shop-item-cost">${costLabel}</span>
                     </div>`;
                 }).join('')}
             </div>
@@ -670,8 +675,16 @@ const Campaign = {
                     ${this.veteranRoster.map(v => {
                         const tc = TYPE_CONFIG[v.type];
                         const sc = SIZE_CONFIG[v.size];
+                        const ups = this._veteranUpgrades[v.id];
+                        let upsTxt = '';
+                        if (ups) {
+                            const parts = [];
+                            if (ups.damageUpgrades > 0) parts.push(`\u2694+${ups.damageUpgrades * 15}%`);
+                            if (ups.armorUpgrades > 0) parts.push(`\u{1F6E1}+${ups.armorUpgrades * 15}%`);
+                            if (parts.length > 0) upsTxt = ` <span style="color:#8b6914;font-size:11px;">(${parts.join(' ')})</span>`;
+                        }
                         return `<div class="vet-option" data-vet-id="${v.id}">
-                            <span>${unitSymbolHTML(v.type, v.size, true)} \u2605 ${tc.label} ${sc.label}</span>
+                            <span>${unitSymbolHTML(v.type, v.size, true)} \u2605 ${tc.label} ${sc.label}${upsTxt}</span>
                             <span class="cost">${v.cost}</span>
                         </div>`;
                     }).join('')}
@@ -679,7 +692,7 @@ const Campaign = {
             `;
         }
 
-        const battleNum = this.currentNode + 1;
+        const battleNum = this.getCompletedBattleCount() + 1;
         container.innerHTML = `
             <div class="menu-content">
                 <div class="setup-header">
@@ -846,6 +859,8 @@ const Campaign = {
         const pInitial = Army.playerUnits.reduce((s, u) => s + u.maxHp, 0);
         const pRemaining = playerAlive.reduce((s, u) => s + u.hp, 0);
         const eInitial = AI.units.reduce((s, u) => s + u.maxHp, 0);
+        const enemyAlive = AI.units.filter(u => u.alive);
+        const eRemaining = enemyAlive.reduce((s, u) => s + u.hp, 0);
         const minutes = Math.floor(Game.battleTime / 60);
         const seconds = Math.floor(Game.battleTime % 60);
 
@@ -916,7 +931,7 @@ const Campaign = {
                     <div>Battle ${this.getCompletedBattleCount()} of ${totalBattles}</div>
                     <div>Duration: ${minutes}:${seconds.toString().padStart(2, '0')}</div>
                     <div>Your Strength: ${Math.round(pRemaining)} / ${pInitial}</div>
-                    <div>Enemy Strength: 0 / ${eInitial}</div>
+                    <div>Enemy Strength: ${Math.round(eRemaining)} / ${eInitial}</div>
                     ${victory && this._lastEarnings ? `<div style="color:#8b6914; margin-top:8px;">
                         <strong>+${this._lastEarnings.total} Denarii</strong> (${this._lastEarnings.base} base + ${this._lastEarnings.survival} survival bonus)
                         <div style="opacity:0.7; font-size:12px;">Total: ${this.coins} Denarii</div>

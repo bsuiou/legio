@@ -327,7 +327,8 @@ const Combat = {
         }
     },
 
-    // Auto-engage: idle player units (not archers) seek nearby visible enemies after 3s idle
+    // Auto-engage: idle units seek nearby visible enemies
+    // Triggers immediately if under fire, otherwise after 2s idle
     autoEngageIdle(playerUnits, enemyUnits) {
         const engageRange = 150;
 
@@ -338,8 +339,11 @@ const Combat = {
             if (pu.category === 'archers') continue;
             // Hold ground: skip auto-engage
             if (pu.holdGround) continue;
-            // Only auto-engage after being idle for 3 seconds
-            if (pu.idleTime < 3.0) continue;
+            // Under fire: engage immediately with extended range
+            const underFire = pu._underFire;
+            pu._underFire = false; // reset flag each tick
+            // Only auto-engage after being idle for 2 seconds (or immediately if under fire)
+            if (!underFire && pu.idleTime < 2.0) continue;
 
             let closest = null, closestDist = engageRange;
             for (const eu of enemyUnits) {

@@ -1064,10 +1064,21 @@ img.map-preview {
 }
 
 .shop-item.bought {
-    opacity: 0.5;
+    background: rgba(40, 90, 30, 0.25);
+    border-color: rgba(40, 90, 30, 0.6);
     cursor: default;
-    background: rgba(74, 122, 42, 0.08);
-    border-color: rgba(74, 122, 42, 0.3);
+}
+.shop-item.bought .shop-item-cost {
+    color: #3a7a2a;
+    font-weight: bold;
+}
+.shop-item.bought-stacked {
+    background: rgba(40, 90, 30, 0.20);
+    border-color: rgba(40, 90, 30, 0.5);
+}
+.shop-item.bought-stacked .shop-item-cost {
+    color: #3a7a2a;
+    font-weight: bold;
 }
 
 .shop-item.too-expensive {

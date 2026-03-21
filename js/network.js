@@ -325,12 +325,10 @@ const Network = {
     compressArrows(arrows) {
         if (!arrows || arrows.length === 0) return [];
         return arrows.map(a => ({
-            x: Math.round(a.x),
-            y: Math.round(a.y),
-            tx: Math.round(a.targetX),
-            ty: Math.round(a.targetY),
-            t: Math.round(a.time * 100) / 100,
-            d: Math.round(a.duration * 100) / 100,
+            fx: Math.round(a.from.x),
+            fy: Math.round(a.from.y),
+            tx: Math.round(a.to.x),
+            ty: Math.round(a.to.y),
         }));
     },
 

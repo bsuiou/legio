@@ -405,8 +405,8 @@ class Unit {
                             const tdy = this.targetY - this.y;
                             const dot = perpX * tdx + perpY * tdy;
                             const sign = dot > 0 ? 1 : -1;
-                            this.targetX += perpX * sign * 20;
-                            this.targetY += perpY * sign * 20;
+                            this.targetX += perpX * sign * 8;
+                            this.targetY += perpY * sign * 8;
                             // Clamp target to map
                             this.targetX = Math.max(20, Math.min(GameMap.width - 20, this.targetX));
                             this.targetY = Math.max(20, Math.min(GameMap.height - 20, this.targetY));
@@ -496,6 +496,7 @@ class Unit {
         }
 
         this.hp -= amount;
+        this._underFire = true; // flag for auto-engage
 
         // Morale loss proportional to damage taken
         let moraleLoss = (amount / this.maxHp) * 80;
