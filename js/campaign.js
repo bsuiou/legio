@@ -188,7 +188,7 @@ const Campaign = {
                         const dmgPct = (10 + ups.damageUpgrades * 15);
                         const armPct = (10 + ups.armorUpgrades * 15);
                         return `<div class="shop-vet-row">
-                            <span class="shop-vet-name">${unitSymbolHTML(v.type, v.size, true)} \u2605 ${tc.label} ${sc.label}</span>
+                            <span class="shop-vet-name">${unitSymbolHTML(v.type, v.size, true, true)} ${tc.label} ${sc.label}</span>
                             <span class="shop-vet-stats">
                                 <span class="vet-stat dmg" title="Damage bonus">+${dmgPct}% dmg</span>
                                 <span class="vet-stat arm" title="Armor bonus">-${armPct}% taken</span>
@@ -684,7 +684,7 @@ const Campaign = {
                             if (parts.length > 0) upsTxt = ` <span style="color:#8b6914;font-size:11px;">(${parts.join(' ')})</span>`;
                         }
                         return `<div class="vet-option" data-vet-id="${v.id}">
-                            <span>${unitSymbolHTML(v.type, v.size, true)} \u2605 ${tc.label} ${sc.label}${upsTxt}</span>
+                            <span>${unitSymbolHTML(v.type, v.size, true, true)} ${tc.label} ${sc.label}${upsTxt}</span>
                             <span class="cost">${v.cost}</span>
                         </div>`;
                     }).join('')}
@@ -731,11 +731,10 @@ const Campaign = {
         const list = document.getElementById('rosterList');
         if (!list) return;
         list.innerHTML = Army.playerUnits.map((u, i) => {
-            const vet = u.veteran ? '\u2605 ' : '';
             const isMerc = u._isMercenary;
             const tag = isMerc ? '<span class="merc-tag">Mercenary</span>' : '';
             return `<div class="roster-item ${isMerc ? 'merc-item' : ''}">
-                <span>${unitSymbolHTML(u.type, u.size, true)} ${vet}${u.getDisplayInfo()} ${tag}</span>
+                <span>${unitSymbolHTML(u.type, u.size, true, !!u._veteranId)} ${u.getDisplayInfo()} ${tag}</span>
                 ${isMerc ? '<span class="merc-free">FREE</span>' : `<button class="remove-btn" data-index="${i}">Remove</button>`}
             </div>`;
         }).join('') || '<p style="color:#888; font-style:italic; padding:10px;">No units added yet</p>';

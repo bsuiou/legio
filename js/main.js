@@ -882,13 +882,12 @@ const Game = {
             if (i >= 9) return; // max 9 slots
             const label = this._shortLabel(u.type);
             const sub = u.subName ? ` ${u.subName}` : '';
-            const sym = unitSymbolHTML(u.type, u.size, true);
-            // Badge indicators for veterans/mercs/upgrades
+            const sym = unitSymbolHTML(u.type, u.size, true, !!u._veteranId);
+            // Badge indicators for upgrade pips — stars are shown inside the model
             let badges = '';
             let slotClass = 'hotbar-slot';
             if (u._veteranId) {
                 slotClass += ' veteran';
-                badges += '<span class="badge-vet">\u2605</span>';
                 const dmg = u._vetDamageUps || 0;
                 const arm = u._vetArmorUps || 0;
                 if (dmg > 0) badges += `<span class="badge-dmg">\u2694${dmg > 1 ? '\u00d7' + dmg : ''}</span>`;
