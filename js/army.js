@@ -1,50 +1,69 @@
-// Unit symbol helper — generates HTML badge with shape + abstract symbol + size tier
+// Unit symbol helper — generates HTML badge matching in-game flag-style unit models
 function unitSymbolHTML(type, size, small) {
     const tc = TYPE_CONFIG[type];
     const sc = SIZE_CONFIG[size];
-    const s = small ? 0.75 : 1; // scale factor
-    const shapeColor = '#5c3d20';
-    const shapeFill = 'rgba(139, 105, 20, 0.25)';
-    const strokeW = tc.bold ? 4 : 1.5;
+    const s = small ? 0.75 : 1;
 
-    // Shape dimensions — legion is wider to reflect its real shape
-    let svgW, svgH, shapeHTML;
-    if (sc.shape === 'circle') {
-        const dim = Math.round(24 * s);
-        svgW = svgH = dim;
-        shapeHTML = `<circle cx="${dim/2}" cy="${dim/2}" r="${dim/2-2}" fill="${shapeFill}" stroke="${shapeColor}" stroke-width="1.5"/>`;
-    } else if (sc.shape === 'square') {
-        const dim = Math.round(24 * s);
-        svgW = svgH = dim;
-        shapeHTML = `<rect x="2" y="2" width="${dim-4}" height="${dim-4}" fill="${shapeFill}" stroke="${shapeColor}" stroke-width="1.5"/>`;
-    } else {
-        // Legion: wider rectangle to show scale
-        svgW = Math.round(36 * s);
+    // Colors matching the game renderer
+    const fillColor  = 'rgba(20, 140, 20, 0.95)';   // vivid green (player)
+    const lightFill  = 'rgba(120, 220, 120, 0.95)';  // lighter green — cavalry top-left triangle
+    const borderColor = 'rgba(0, 0, 0, 0.75)';
+    const symColor   = 'rgba(255, 255, 255, 0.92)';  // white symbol
+    const strokeW    = tc.bold ? 3 : 1.5;
+    const bw         = 1.5; // border stroke width
+
+    // Shape dimensions — landscape orientation, front line is the longer side
+    // Matches the proportions of the new in-game models (width=depth, height=front line)
+    let svgW, svgH;
+    if (sc.shape === 'square') {           // Century: square
+        svgW = svgH = Math.round(22 * s);
+    } else if (size === UnitSize.COHORT) { // Cohort: rect ~half legion area
+        svgW = Math.round(34 * s);
+        svgH = Math.round(18 * s);
+    } else {                               // Legion: larger landscape rect
+        svgW = Math.round(46 * s);
         svgH = Math.round(24 * s);
-        shapeHTML = `<rect x="1" y="2" width="${svgW-2}" height="${svgH-4}" fill="${shapeFill}" stroke="${shapeColor}" stroke-width="1.5"/>`;
     }
 
-    // Abstract symbol inside the shape — inset so stroke doesn't overflow
+    // SVG inner area bounds
+    const x0 = bw / 2, y0 = bw / 2;
+    const x1 = svgW - bw / 2, y1 = svgH - bw / 2;
     const cx = svgW / 2, cy = svgH / 2;
-    const innerH = (sc.shape === 'rect') ? svgH - 12 : svgH - 12;
-    const symSize = Math.min(Math.round(11 * s), innerH);
-    let symHTML = '';
-    if (tc.symbol === 'x') {
-        symHTML = `<line x1="${cx-symSize/2}" y1="${cy-symSize/2}" x2="${cx+symSize/2}" y2="${cy+symSize/2}" stroke="${shapeColor}" stroke-width="${strokeW}" stroke-linecap="round"/>
-                   <line x1="${cx+symSize/2}" y1="${cy-symSize/2}" x2="${cx-symSize/2}" y2="${cy+symSize/2}" stroke="${shapeColor}" stroke-width="${strokeW}" stroke-linecap="round"/>`;
-    } else if (tc.symbol === '/') {
-        symHTML = `<line x1="${cx-symSize*0.3}" y1="${cy+symSize/2}" x2="${cx+symSize*0.3}" y2="${cy-symSize/2}" stroke="${shapeColor}" stroke-width="${strokeW}" stroke-linecap="round"/>`;
-    } else if (tc.symbol === '•') {
-        symHTML = `<circle cx="${cx}" cy="${cy}" r="${symSize*0.25}" fill="${shapeColor}"/>`;
+
+    let svgContent = '';
+
+    // 1. Main fill rectangle (stroke drawn last so it sits on top)
+    svgContent += `<rect x="${x0}" y="${y0}" width="${svgW - bw}" height="${svgH - bw}" fill="${fillColor}"/>`;
+
+    // 2. Cavalry: lighter top-left triangle (above the '/' diagonal), matching renderer
+    if (tc.symbol === '/') {
+        svgContent += `<polygon points="${x0},${y0} ${x1},${y0} ${x0},${y1}" fill="${lightFill}"/>`;
     }
 
-    // Tier: I/II/III for unit size
+    // 3. Symbol — inset from edges
+    const symW = cx - x0 - 3;
+    const symH = cy - y0 - 2;
+    if (tc.symbol === 'x') {
+        svgContent += `<line x1="${cx-symW}" y1="${cy-symH}" x2="${cx+symW}" y2="${cy+symH}" stroke="${symColor}" stroke-width="${strokeW}" stroke-linecap="round"/>
+                       <line x1="${cx+symW}" y1="${cy-symH}" x2="${cx-symW}" y2="${cy+symH}" stroke="${symColor}" stroke-width="${strokeW}" stroke-linecap="round"/>`;
+    } else if (tc.symbol === '/') {
+        // Diagonal from bottom-left to top-right, matching the renderer's '/' direction
+        svgContent += `<line x1="${x0}" y1="${y1}" x2="${x1}" y2="${y0}" stroke="${symColor}" stroke-width="${strokeW}" stroke-linecap="round"/>`;
+    } else if (tc.symbol === '•') {
+        const dotR = Math.min(symW, symH) * 0.5;
+        svgContent += `<circle cx="${cx}" cy="${cy}" r="${dotR}" fill="${symColor}"/>`;
+    }
+
+    // 4. Border on top so it's always visible above fill and triangle
+    svgContent += `<rect x="${x0}" y="${y0}" width="${svgW - bw}" height="${svgH - bw}" fill="none" stroke="${borderColor}" stroke-width="${bw}"/>`;
+
+    // Tier rank label: I / II / III
     const sizeRank = size === UnitSize.LEGION ? 'III' : size === UnitSize.COHORT ? 'II' : 'I';
     const tierColor = '#8b6914';
     const tierSize = small ? 10 : 12;
 
     return `<span class="unit-sym" style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle;">
-        <svg width="${svgW}" height="${svgH}" style="vertical-align:middle;">${shapeHTML}${symHTML}</svg>
+        <svg width="${svgW}" height="${svgH}" style="vertical-align:middle;">${svgContent}</svg>
         <span style="font-size:${tierSize}px;color:${tierColor};font-weight:bold;line-height:1;">${sizeRank}</span>
     </span>`;
 }
