@@ -32,6 +32,13 @@ canvas {
     background: radial-gradient(ellipse at center, #d4b896 0%, #a08060 60%, #5c3d20 100%);
 }
 
+/* Main menu: Trajan's Column relief photo, undistorted, with dark tint */
+#mainMenu {
+    background:
+        linear-gradient(rgba(20, 12, 4, 0.55), rgba(20, 12, 4, 0.55)),
+        url('../assets/menu-bg.jpg') center center / cover no-repeat;
+}
+
 .overlay.hidden {
     display: none;
 }
