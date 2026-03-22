@@ -15,8 +15,8 @@ const UnitType = {
 
 const SIZE_CONFIG = {
     [UnitSize.CENTURY]: { strength: 80, shape: 'square', size: 20, turnRate: Math.PI * 1.0, label: 'Century', combatEff: 1.0 },
-    [UnitSize.COHORT]: { strength: 480, shape: 'rect', width: 34, height: 18, turnRate: Math.PI * 0.5, label: 'Cohort', combatEff: 1.0 },
-    [UnitSize.LEGION]: { strength: 5280, shape: 'rect', width: 64, height: 32, turnRate: Math.PI * 0.25, label: 'Legion', combatEff: 0.25 }
+    [UnitSize.COHORT]: { strength: 480, shape: 'rect', width: 18, height: 34, turnRate: Math.PI * 0.5, label: 'Cohort', combatEff: 1.0 },
+    [UnitSize.LEGION]: { strength: 5280, shape: 'rect', width: 32, height: 64, turnRate: Math.PI * 0.25, label: 'Legion', combatEff: 0.25 }
 };
 
 const TYPE_CONFIG = {

@@ -249,7 +249,7 @@ const Renderer = {
         if (unit.hp < unit.maxHp) {
             ctx.save();
             ctx.scale(this.scale, this.scale);
-            const barW = sc.shape === 'rect' ? Math.round(sc.width * 0.9) : Math.round(sc.size * 0.9);
+            const barW = sc.shape === 'rect' ? Math.round(Math.max(sc.width, sc.height) * 0.9) : Math.round(sc.size * 0.9);
             const barH = 5;
             const barX = unit.x - barW / 2;
             const rawOffset = sc.shape === 'square' ? sc.size / 2 : sc.height / 2;

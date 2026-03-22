@@ -1686,8 +1686,8 @@ const GameMap = {
         this.ditches = [];
     },
 
-    // Max ditch length: 2.5× legion longest side (72px) = 180px
-    get MAX_DITCH_LENGTH() { return SIZE_CONFIG[UnitSize.LEGION].width * 2.5; },
+    // Max ditch length: 2.5× legion longest side (64px) = 160px
+    get MAX_DITCH_LENGTH() { return SIZE_CONFIG[UnitSize.LEGION].height * 2.5; },
 
     // Start a new ditch trail for a digging unit
     startDitch(x, y, width) {
