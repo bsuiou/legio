@@ -156,12 +156,12 @@ const Combat = {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < 1) return;
 
-        const touchDist = unitA.getCollisionRadius() + unitB.getCollisionRadius();
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const touchDist = unitA.getProjectedRadius(nx, ny) + unitB.getProjectedRadius(nx, ny);
         const penetration = touchDist - dist;
         // Only push if significantly overlapping (>5px), gentle push to reduce combat sliding
         if (penetration > 5) {
-            const nx = dx / dist;
-            const ny = dy / dist;
             const push = (penetration - 5) * 0.08;
             const rA = unitA.getCollisionRadius();
             const rB = unitB.getCollisionRadius();
@@ -274,7 +274,7 @@ const Combat = {
         for (let i = 0; i < allUnits.length; i++) {
             const a = allUnits[i];
             if (!a.alive) continue;
-            const rA = a.getCollisionRadius();
+            const boundA = a.getBoundingRadius();
             for (let j = i + 1; j < allUnits.length; j++) {
                 const b = allUnits[j];
                 if (!b.alive) continue;
@@ -283,18 +283,20 @@ const Combat = {
                 const dx = b.x - a.x;
                 const dy = b.y - a.y;
                 const distSq = dx * dx + dy * dy;
-                const touchDist = rA + b.getCollisionRadius();
-                // Quick reject: skip if clearly not overlapping
-                if (distSq >= touchDist * touchDist) continue;
+                // Quick reject using bounding circles (conservative upper bound)
+                const maxTouchDist = boundA + b.getBoundingRadius();
+                if (distSq >= maxTouchDist * maxTouchDist) continue;
 
                 const dist = Math.sqrt(distSq);
                 if (dist < 0.5) continue;
-                const penetration = touchDist - dist;
-                // Dead zone: ignore overlaps smaller than 1px to prevent micro-jitter
-                if (penetration < 1) continue;
 
                 const nx = dx / dist;
                 const ny = dy / dist;
+                // Precise OBB-projected touch distance accounting for each unit's orientation
+                const touchDist = a.getProjectedRadius(nx, ny) + b.getProjectedRadius(nx, ny);
+                const penetration = touchDist - dist;
+                // Dead zone: ignore overlaps smaller than 1px to prevent micro-jitter
+                if (penetration < 1) continue;
                 const aLocked = a.inCombat;
                 const bLocked = b.inCombat;
                 if (aLocked && bLocked) continue;

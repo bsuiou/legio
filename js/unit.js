@@ -176,6 +176,27 @@ class Unit {
         return (sc.width + sc.height) / 4;
     }
 
+    // Conservative bounding circle radius — used as a cheap early-reject before precise OBB check
+    getBoundingRadius() {
+        const sc = SIZE_CONFIG[this.size];
+        if (sc.shape === 'circle') return sc.radius;
+        if (sc.shape === 'square') return sc.size * 0.5 * Math.SQRT2;
+        return Math.hypot(sc.width / 2, sc.height / 2);
+    }
+
+    // How far this unit's footprint extends in world direction (nx, ny), accounting for orientation.
+    // For rects this is the OBB projection — the accurate "edge" in that direction.
+    getProjectedRadius(nx, ny) {
+        const sc = SIZE_CONFIG[this.size];
+        if (sc.shape === 'circle') return sc.radius;
+        if (sc.shape === 'square') return sc.size * 0.7;
+        const cosA = Math.cos(this.angle);
+        const sinA = Math.sin(this.angle);
+        const hw = sc.width / 2;
+        const hh = sc.height / 2;
+        return hw * Math.abs(nx * cosA + ny * sinA) + hh * Math.abs(nx * (-sinA) + ny * cosA);
+    }
+
     getVisionRange() {
         let range = VISION_RANGE[this.type] || 200;
         // Hill bonus: units on hills get minimum 500px vision
