@@ -122,7 +122,11 @@ const Combat = {
         const dx = unitA.x - unitB.x;
         const dy = unitA.y - unitB.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const engageDist = unitA.getCollisionRadius() + unitB.getCollisionRadius() + 5;
+        if (dist < 0.5) return false;
+        const nx = dx / dist;
+        const ny = dy / dist;
+        // Use OBB projection so the full front line of rectangular units can engage
+        const engageDist = unitA.getProjectedRadius(nx, ny) + unitB.getProjectedRadius(nx, ny) + 5;
 
         return dist <= engageDist;
     },
