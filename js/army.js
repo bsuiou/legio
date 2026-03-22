@@ -350,6 +350,10 @@ const Army = {
         roster.unit.x = x;
         roster.unit.y = y;
         roster.placed = true;
+        // Guest units face left (toward the host side)
+        if (Network.isMultiplayer && !Network.isHost) {
+            roster.unit.angle = Math.PI;
+        }
 
         // Auto-advance to next unplaced unit in same group
         if (this._activeGroupKey) {
