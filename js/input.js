@@ -407,19 +407,20 @@ const Input = {
             }
         }
 
-        // Disengage any units currently in combat, clear hold ground
-        for (const u of selected) {
-            if (u.inCombat) {
-                Combat.disengage(u);
-            }
+        // Engaged units are locked in combat — only Retreat or Rout can free them.
+        // Only issue move orders to units that are free to move.
+        const movable = selected.filter(u => !u.inCombat);
+
+        // Clear state for movable units only
+        for (const u of movable) {
             u.holdGround = false; // Moving cancels hold ground
             u.targetQueue = []; // Clear waypoint queue on new command
             u.idleTime = 0; // Reset idle timer on manual command
             u._bridgeRouted = false; // Allow new bridge routing
         }
 
-        // Assign targets
-        for (const u of selected) {
+        // Assign targets (engaged units receive no orders — they stay locked)
+        for (const u of movable) {
             let destX = gx, destY = gy;
 
             // Archers: if targeting an enemy, stop at shooting range instead of walking into melee
@@ -455,8 +456,8 @@ const Input = {
         }
 
         // Formation spread for multi-select ground moves (no enemy target)
-        if (!targetEnemy && selected.length > 1) {
-            this._applyFormation(selected, gx, gy);
+        if (!targetEnemy && movable.length > 1) {
+            this._applyFormation(movable, gx, gy);
         }
     },
 
@@ -730,7 +731,8 @@ const Input = {
         if (Game.state === 'BATTLE') {
             for (let p = 0; p < assignment.length; p++) {
                 const u = selected[assignment[p]];
-                if (u.inCombat) Combat.disengage(u);
+                // Engaged units are locked — formation orders cannot pull them out of combat
+                if (u.inCombat) continue;
                 u.holdGround = false;
                 u.targetQueue = [];
                 u.idleTime = 0;
