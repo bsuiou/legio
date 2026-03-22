@@ -217,6 +217,22 @@ const Renderer = {
             ctx.lineTo(-symW, symH);
             ctx.stroke();
         } else if (tc.symbol === '/') {
+            // Fill the top-left triangle (above the diagonal) with a lighter shade
+            const hw = sc.shape === 'square' ? sc.size / 2 : sc.width / 2;
+            const hh = sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
+            const lightFill = isMerc
+                ? 'rgba(180, 165, 80, 0.95)'
+                : isPlayer ? 'rgba(120, 220, 120, 0.95)'
+                : 'rgba(245, 120, 110, 0.95)';
+            ctx.fillStyle = lightFill;
+            ctx.beginPath();
+            ctx.moveTo(-hw, -hh); // top-left
+            ctx.lineTo(hw, -hh);  // top-right
+            ctx.lineTo(-hw, hh);  // bottom-left
+            ctx.closePath();
+            ctx.fill();
+            // Draw the diagonal line on top
+            ctx.strokeStyle = symbolColor;
             ctx.beginPath();
             ctx.moveTo(-symW, symH);
             ctx.lineTo(symW, -symH);
