@@ -172,7 +172,8 @@ class Unit {
         const sc = SIZE_CONFIG[this.size];
         if (sc.shape === 'circle') return sc.radius;
         if (sc.shape === 'square') return sc.size * 0.7;
-        return Math.max(sc.width, sc.height) * 0.5;
+        // Average of half-dimensions: aligns with front-to-front and flanking contact
+        return (sc.width + sc.height) / 4;
     }
 
     getVisionRange() {
