@@ -163,31 +163,21 @@ const Renderer = {
         const sizeScale = 0.4 + 0.6 * hpRatio;
         ctx.scale(sizeScale, sizeScale);
 
-        // Colors — mercenaries get a distinct olive/gold tint
+        // Flag-style colors: vivid opaque fill, white symbol, dark border
         const isMerc = isPlayer && unit._isMercenary;
-        const fillColor = isMerc ? 'rgba(90, 80, 30, 0.85)' : isPlayer ? 'rgba(40, 90, 40, 0.85)' : 'rgba(140, 50, 30, 0.85)';
-        const strokeColor = isMerc ? '#4a4010' : isPlayer ? '#1a4a1a' : '#6a2010';
-        const symbolColor = isPlayer ? '#c0e0c0' : '#f0c0a0';
+        const fillColor = isMerc ? 'rgba(110, 100, 30, 0.95)'
+            : isPlayer ? 'rgba(20, 140, 20, 0.95)'
+            : 'rgba(170, 25, 20, 0.95)';
+        const borderColor = 'rgba(0, 0, 0, 0.75)';
+        const symbolColor = 'rgba(255, 255, 255, 0.92)';
 
         ctx.fillStyle = fillColor;
-        ctx.strokeStyle = strokeColor;
+        ctx.strokeStyle = borderColor;
         ctx.lineWidth = unit.selected ? 3 : 2;
 
-        // Draw shape
-        if (sc.shape === 'circle') {
-            ctx.beginPath();
-            ctx.arc(0, 0, sc.radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            if (unit.selected) {
-                ctx.strokeStyle = '#ffd700';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(0, 0, sc.radius + 3, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-        } else if (sc.shape === 'square') {
-            const hs = sc.size / 2; // half-size for centering
+        // Draw shape — CENTURY=square, COHORT=rect, LEGION=rect
+        if (sc.shape === 'square') {
+            const hs = sc.size / 2;
             ctx.fillRect(-hs, -hs, sc.size, sc.size);
             ctx.strokeRect(-hs, -hs, sc.size, sc.size);
             if (unit.selected) {
@@ -195,7 +185,7 @@ const Renderer = {
                 ctx.lineWidth = 2;
                 ctx.strokeRect(-hs - 3, -hs - 3, sc.size + 6, sc.size + 6);
             }
-        } else { // rect
+        } else { // rect (COHORT and LEGION)
             const hw = sc.width / 2, hh = sc.height / 2;
             ctx.fillRect(-hw, -hh, sc.width, sc.height);
             ctx.strokeRect(-hw, -hh, sc.width, sc.height);
@@ -206,21 +196,20 @@ const Renderer = {
             }
         }
 
-        // Draw symbol inside (rotates with unit shape)
+        // Draw symbol inside (rotates with unit)
+        // Inset and line width scale to the smaller dimension of the shape
+        const halfMin = sc.shape === 'square' ? sc.size / 2 : Math.min(sc.width, sc.height) / 2;
+        const inset = Math.max(2, halfMin * 0.22);
+        const symW = sc.shape === 'square' ? sc.size / 2 - inset : sc.width / 2 - inset;
+        const symH = sc.shape === 'square' ? sc.size / 2 - inset : sc.height / 2 - inset;
+        const symbolLW = tc.bold ? Math.max(2.5, halfMin * 0.32) : Math.max(1.2, halfMin * 0.13);
+
         ctx.fillStyle = symbolColor;
         ctx.strokeStyle = symbolColor;
-        ctx.lineWidth = tc.bold ? 5.5 : 2;
+        ctx.lineWidth = symbolLW;
         ctx.lineCap = 'round';
 
-        // Symbol inset from edges so stroke doesn't overflow the shape
-        const inset = tc.bold ? 6 : 4;
-        const symW = sc.shape === 'circle' ? sc.radius * 0.55 :
-            sc.shape === 'square' ? sc.size / 2 - inset : sc.width / 2 - inset;
-        const symH = sc.shape === 'circle' ? sc.radius * 0.55 :
-            sc.shape === 'square' ? sc.size / 2 - inset : sc.height / 2 - inset;
-
         if (tc.symbol === 'x') {
-            // Draw X from corner to corner
             ctx.beginPath();
             ctx.moveTo(-symW, -symH);
             ctx.lineTo(symW, symH);
@@ -228,31 +217,28 @@ const Renderer = {
             ctx.lineTo(-symW, symH);
             ctx.stroke();
         } else if (tc.symbol === '/') {
-            // Draw diagonal from corner to corner
             ctx.beginPath();
             ctx.moveTo(-symW, symH);
             ctx.lineTo(symW, -symH);
             ctx.stroke();
         } else if (tc.symbol === '•') {
-            // Draw dot
             ctx.beginPath();
-            ctx.arc(0, 0, Math.min(symW, symH) * 0.4, 0, Math.PI * 2);
+            ctx.arc(0, 0, Math.min(symW, symH) * 0.5, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Direction indicator — prominent arrowhead/chevron at the front edge
-        const frontDist = sc.shape === 'circle' ? sc.radius :
-            sc.shape === 'square' ? sc.size / 2 : sc.width / 2;
-        const chevSize = frontDist * 0.4; // 40% of unit size
-        const chevX = frontDist + 2; // just outside the edge
-        ctx.fillStyle = isPlayer ? 'rgba(180, 230, 180, 0.7)' : 'rgba(240, 180, 150, 0.7)';
-        ctx.strokeStyle = isPlayer ? 'rgba(30, 80, 30, 0.6)' : 'rgba(120, 40, 20, 0.6)';
-        ctx.lineWidth = 1.5;
+        // Direction indicator — chevron at the front edge
+        const frontDist = sc.shape === 'square' ? sc.size / 2 : sc.width / 2;
+        const chevSize = frontDist * 0.4;
+        const chevX = frontDist + 2;
+        ctx.fillStyle = isPlayer ? 'rgba(180, 255, 180, 0.8)' : 'rgba(255, 180, 150, 0.8)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(chevX + chevSize, 0);                  // tip
-        ctx.lineTo(chevX - chevSize * 0.3, -chevSize * 0.6); // top wing
-        ctx.lineTo(chevX, 0);                              // inner notch
-        ctx.lineTo(chevX - chevSize * 0.3, chevSize * 0.6);  // bottom wing
+        ctx.moveTo(chevX + chevSize, 0);
+        ctx.lineTo(chevX - chevSize * 0.3, -chevSize * 0.6);
+        ctx.lineTo(chevX, 0);
+        ctx.lineTo(chevX - chevSize * 0.3, chevSize * 0.6);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
@@ -263,10 +249,10 @@ const Renderer = {
         if (unit.hp < unit.maxHp) {
             ctx.save();
             ctx.scale(this.scale, this.scale);
-            const barW = sc.shape === 'rect' ? 50 : sc.shape === 'square' ? 40 : 30;
+            const barW = sc.shape === 'rect' ? Math.round(sc.width * 0.9) : Math.round(sc.size * 0.9);
             const barH = 5;
             const barX = unit.x - barW / 2;
-            const rawOffset = sc.shape === 'circle' ? sc.radius : sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
+            const rawOffset = sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
             const barY = unit.y - rawOffset * sizeScale - 10;
 
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -285,7 +271,7 @@ const Renderer = {
         if (unit.morale < 100) {
             ctx.save();
             ctx.scale(this.scale, this.scale);
-            const rawOff = sc.shape === 'circle' ? sc.radius : sc.shape === 'square' ? sc.size / 2 : Math.max(sc.width, sc.height) / 2;
+            const rawOff = sc.shape === 'square' ? sc.size / 2 : Math.max(sc.width, sc.height) / 2;
             const mBarH = rawOff * 2 * sizeScale; // full height matches unit visual size
             const mBarW = 3;
             const mBarX = unit.x - rawOff * sizeScale - 6;
@@ -305,7 +291,7 @@ const Renderer = {
         if (isPlayer && (unit._veteranId || unit._isMercenary)) {
             ctx.save();
             ctx.scale(this.scale, this.scale);
-            const rawOff = sc.shape === 'circle' ? sc.radius : sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
+            const rawOff = sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
             const indicY = unit.y - rawOff * sizeScale - (unit.hp < unit.maxHp ? 18 : 10);
             const indicX = unit.x;
 
@@ -349,8 +335,7 @@ const Renderer = {
             ctx.scale(this.scale, this.scale);
             ctx.translate(unit.x, unit.y);
 
-            const threatRadius = sc.shape === 'circle' ? sc.radius + 6 :
-                sc.shape === 'square' ? sc.size / 2 + 6 : Math.max(sc.width, sc.height) / 2 + 6;
+            const threatRadius = sc.shape === 'square' ? sc.size / 2 + 6 : Math.max(sc.width, sc.height) / 2 + 6;
 
             for (const threat of unit.facingThreats) {
                 const attackFrom = threat.attackAngle;
