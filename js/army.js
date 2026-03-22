@@ -1,5 +1,5 @@
 // Unit symbol helper — generates HTML badge matching in-game flag-style unit models
-function unitSymbolHTML(type, size, small) {
+function unitSymbolHTML(type, size, small, veteran = false) {
     const tc = TYPE_CONFIG[type];
     const sc = SIZE_CONFIG[size];
     const s = small ? 0.75 : 1;
@@ -54,7 +54,14 @@ function unitSymbolHTML(type, size, small) {
         svgContent += `<circle cx="${cx}" cy="${cy}" r="${dotR}" fill="${symColor}"/>`;
     }
 
-    // 4. Border on top so it's always visible above fill and triangle
+    // 4. Veteran ★★ inside the shape (lower centre)
+    if (veteran) {
+        const starFontSize = Math.max(5, Math.round(svgH * 0.28));
+        const starY = y0 + (svgH - bw) * 0.76;
+        svgContent += `<text x="${cx}" y="${starY}" text-anchor="middle" dominant-baseline="middle" font-size="${starFontSize}" font-weight="bold" fill="#f0d040">★★</text>`;
+    }
+
+    // 5. Border on top so it's always visible above fill and triangle
     svgContent += `<rect x="${x0}" y="${y0}" width="${svgW - bw}" height="${svgH - bw}" fill="none" stroke="${borderColor}" stroke-width="${bw}"/>`;
 
     // Tier rank label: I / II / III
@@ -164,7 +171,7 @@ const Army = {
 
         list.innerHTML = this.playerUnits.map((u, i) => `
             <div class="roster-item">
-                <span>${unitSymbolHTML(u.type, u.size, true)} ${u.getDisplayInfo()}</span>
+                <span>${unitSymbolHTML(u.type, u.size, true, !!u._veteranId)} ${u.getDisplayInfo()}</span>
                 <button class="remove-btn" data-index="${i}">Remove</button>
             </div>
         `).join('') || '<p style="color:#888; font-style:italic; padding:10px;">No units added yet</p>';

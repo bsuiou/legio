@@ -259,6 +259,18 @@ const Renderer = {
         ctx.fill();
         ctx.stroke();
 
+        // ★★ inside the shape for veteran units — rotates with the unit model
+        if (unit._veteranId) {
+            const starHalfH = sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
+            const starY = starHalfH * 0.45;
+            const starSize = Math.max(5, halfMin * 0.5);
+            ctx.fillStyle = '#f0d040';
+            ctx.font = `bold ${starSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('\u2605\u2605', 0, starY);
+        }
+
         ctx.restore();
 
         // Health bar (drawn without rotation)
@@ -315,14 +327,11 @@ const Renderer = {
             ctx.textAlign = 'center';
 
             if (unit._veteranId) {
-                // Gold star for veteran
-                ctx.fillStyle = '#e0c060';
-                ctx.fillText('\u2605', indicX, indicY);
-
-                // Upgrade pips to the right of the star
+                // Upgrade pips centred above the unit (star moved inside model)
                 const dmg = unit._vetDamageUps || 0;
                 const arm = unit._vetArmorUps || 0;
-                let pipX = indicX + 7;
+                const totalPips = dmg + arm;
+                let pipX = indicX - (totalPips - 1) * 3;
                 for (let p = 0; p < dmg; p++) {
                     ctx.fillStyle = '#d04030';
                     ctx.beginPath();
