@@ -9,6 +9,7 @@ const Renderer = {
     arrowTimer: 0,
     deathMarkers: [], // { x, y, team, time } — fade out over 10s
     battleTimer: 0, // for pulsing effects
+    placementTimer: 0, // for placement zone pulsing
     battleLog: [], // { text, color, time } — scrolling kill feed
     rallyEffects: [], // { x, y, time } — expanding ring effects
 
@@ -64,28 +65,37 @@ const Renderer = {
         this.ctx.save();
         this.ctx.scale(this.scale, this.scale);
 
+        const pulse = 0.5 + 0.5 * Math.sin(this.placementTimer * 2);
+        const fillAlpha = 0.06 + pulse * 0.18;
+        const borderAlpha = 0.4 + pulse * 0.55;
+        const lineW = 1.5 + pulse * 1.5;
+
+        const isGuestSide = Network.isMultiplayer && !Network.isHost;
+
         if (GameMap.mapType === 'ambush') {
             // Circular placement zone in center
             const cx = GameMap.width / 2, cy = GameMap.height / 2;
-            this.ctx.fillStyle = 'rgba(40, 100, 40, 0.08)';
+            this.ctx.fillStyle = `rgba(40, 180, 40, ${fillAlpha})`;
             this.ctx.beginPath();
             this.ctx.arc(cx, cy, 250, 0, Math.PI * 2);
             this.ctx.fill();
-            // Dashed circle border
-            this.ctx.strokeStyle = 'rgba(139, 105, 20, 0.4)';
-            this.ctx.lineWidth = 2;
+            // Pulsing green dashed circle border
+            this.ctx.strokeStyle = `rgba(60, 220, 60, ${borderAlpha})`;
+            this.ctx.lineWidth = lineW;
             this.ctx.setLineDash([10, 10]);
             this.ctx.stroke();
             this.ctx.setLineDash([]);
         } else {
             const zoneW = GameMap.width / 6;
-            const isGuestSide = Network.isMultiplayer && !Network.isHost;
             const zoneX = isGuestSide ? GameMap.width - zoneW : 0;
             const lineX = isGuestSide ? GameMap.width - zoneW : zoneW;
-            this.ctx.fillStyle = isGuestSide ? 'rgba(100, 40, 40, 0.08)' : 'rgba(40, 100, 40, 0.08)';
+            // Guest stays red, player is green
+            const fillColor = isGuestSide ? `rgba(180, 40, 40, ${fillAlpha})` : `rgba(40, 180, 40, ${fillAlpha})`;
+            const borderColor = isGuestSide ? `rgba(220, 60, 60, ${borderAlpha})` : `rgba(60, 220, 60, ${borderAlpha})`;
+            this.ctx.fillStyle = fillColor;
             this.ctx.fillRect(zoneX, 0, zoneW, GameMap.height);
-            this.ctx.strokeStyle = 'rgba(139, 105, 20, 0.4)';
-            this.ctx.lineWidth = 2;
+            this.ctx.strokeStyle = borderColor;
+            this.ctx.lineWidth = lineW;
             this.ctx.setLineDash([10, 10]);
             this.ctx.beginPath();
             this.ctx.moveTo(lineX, 0);
@@ -95,6 +105,44 @@ const Renderer = {
         }
 
         this.ctx.restore();
+    },
+
+    drawPlacementZoneTooltip(mouseX, mouseY) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.scale(this.scale, this.scale);
+
+        const isGuestSide = Network.isMultiplayer && !Network.isHost;
+        const lines = ['Place your units here', 'Click to place • Drag to rotate'];
+
+        ctx.font = '12px Georgia';
+        let maxW = 0;
+        for (const line of lines) {
+            const w = ctx.measureText(line).width;
+            if (w > maxW) maxW = w;
+        }
+        const padX = 8, padY = 5, lineH = 16;
+        const boxW = maxW + padX * 2;
+        const boxH = lines.length * lineH + padY * 2;
+
+        let tx = mouseX + 15;
+        let ty = mouseY - boxH - 5;
+        if (tx + boxW > 1920) tx = mouseX - boxW - 10;
+        if (ty < 5) ty = mouseY + 20;
+
+        ctx.fillStyle = 'rgba(20, 15, 10, 0.9)';
+        ctx.fillRect(tx, ty, boxW, boxH);
+        ctx.strokeStyle = '#8b6914';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(tx, ty, boxW, boxH);
+
+        const titleColor = isGuestSide ? '#e08060' : '#a0d090';
+        for (let i = 0; i < lines.length; i++) {
+            ctx.fillStyle = i === 0 ? titleColor : '#c0b898';
+            ctx.fillText(lines[i], tx + padX, ty + padY + (i + 1) * lineH - 3);
+        }
+
+        ctx.restore();
     },
 
     drawUnit(unit) {

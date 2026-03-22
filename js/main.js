@@ -1485,9 +1485,28 @@ const Game = {
         requestAnimationFrame((t) => this.loop(t));
     },
 
+    _isInPlacementZone(gx, gy) {
+        if (GameMap.mapType === 'ambush') {
+            const cx = GameMap.width / 2, cy = GameMap.height / 2;
+            const dx = gx - cx, dy = gy - cy;
+            return dx * dx + dy * dy <= 250 * 250;
+        }
+        const zoneW = GameMap.width / 6;
+        const isGuestSide = Network.isMultiplayer && !Network.isHost;
+        const zoneX = isGuestSide ? GameMap.width - zoneW : 0;
+        return gx >= zoneX && gx <= zoneX + zoneW && gy >= 0 && gy <= GameMap.height;
+    },
+
     _renderPlacement() {
+        Renderer.placementTimer = performance.now() / 1000;
         Renderer.drawMap();
         Renderer.drawPlacementZone();
+
+        // Show tooltip when hovering the placement zone
+        const gm = Renderer.screenToGame(Input.mouseX, Input.mouseY);
+        if (this._isInPlacementZone(gm.x, gm.y)) {
+            Renderer.drawPlacementZoneTooltip(gm.x, gm.y);
+        }
 
         // Draw pre-battle order waypoints for placed units
         const allPlaced = Army.rosterForPlacement.every(r => r.placed);
