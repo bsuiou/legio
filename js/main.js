@@ -685,6 +685,23 @@ const Game = {
                     }
                 });
                 break;
+            case 'lineDrag': {
+                if (!cmd.positions || !Array.isArray(cmd.positions)) break;
+                // Use the same matching logic as the local line-drag
+                const assignment = Input._matchUnitsToPositions(units, cmd.positions);
+                for (let p = 0; p < assignment.length; p++) {
+                    const u = units[assignment[p]];
+                    if (u.inCombat) u.removeFromAllCombat();
+                    u.holdGround = false;
+                    u.targetQueue = [];
+                    u.idleTime = 0;
+                    u.targetX = cmd.positions[p].x;
+                    u.targetY = cmd.positions[p].y;
+                    u.attackMove = false;
+                    u.attackMoveTarget = null;
+                }
+                break;
+            }
         }
     },
 

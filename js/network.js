@@ -426,7 +426,7 @@ const Network = {
 
     _validateCommand(cmd) {
         // Type sanity
-        const validTypes = ['move', 'hold', 'retreat', 'rally', 'dig', 'waypoint'];
+        const validTypes = ['move', 'hold', 'retreat', 'rally', 'dig', 'waypoint', 'lineDrag'];
         if (!validTypes.includes(cmd.type)) return false;
 
         // Bounds check for move/waypoint
@@ -434,6 +434,16 @@ const Network = {
             if (typeof cmd.x !== 'number' || typeof cmd.y !== 'number') return false;
             cmd.x = Math.max(0, Math.min(1920, cmd.x));
             cmd.y = Math.max(0, Math.min(1080, cmd.y));
+        }
+
+        // Bounds check for lineDrag positions
+        if (cmd.type === 'lineDrag') {
+            if (!Array.isArray(cmd.positions)) return false;
+            for (const p of cmd.positions) {
+                if (typeof p.x !== 'number' || typeof p.y !== 'number') return false;
+                p.x = Math.max(0, Math.min(1920, p.x));
+                p.y = Math.max(0, Math.min(1080, p.y));
+            }
         }
 
         // Unit ownership: all unitIds must start with 'g' (guest units)

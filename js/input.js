@@ -716,6 +716,16 @@ const Input = {
     },
 
     _applyLineDragPositions(selected, positions) {
+        // Guest: send line-drag positions as a command to the host
+        if (Network.isMultiplayer && !Network.isHost && Game.state === 'BATTLE') {
+            Network.sendCommand({
+                type: 'lineDrag',
+                unitIds: selected.map(u => u.netId),
+                positions: positions.map(p => ({ x: p.x, y: p.y }))
+            });
+            return;
+        }
+
         const assignment = this._matchUnitsToPositions(selected, positions);
         if (Game.state === 'BATTLE') {
             for (let p = 0; p < assignment.length; p++) {
