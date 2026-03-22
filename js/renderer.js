@@ -22,13 +22,16 @@ const Renderer = {
 
     resize() {
         const w = window.innerWidth;
-        const h = window.innerHeight;
+        // Reserve space below the map for whichever hotbar panel is currently visible
+        const visibleBar = [...document.querySelectorAll('.overlay-bar')]
+            .find(el => !el.classList.contains('hidden'));
+        const hotbarH = visibleBar ? visibleBar.offsetHeight : 0;
+        const h = window.innerHeight - hotbarH;
         const targetW = 1920;
         const targetH = 1080;
-        // Fill the width fully, let height adapt (bottom bar overlays)
+        // Fit map into available area (width-first, then clamp to available height)
         this.scale = w / targetW;
         const scaledH = targetH * this.scale;
-        // If scaled height exceeds window, scale to fit height instead
         if (scaledH > h) {
             this.scale = h / targetH;
         }

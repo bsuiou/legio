@@ -175,6 +175,8 @@ const Game = {
                 this._showResult();
                 break;
         }
+        // Resize canvas now that hotbar visibility may have changed
+        Renderer.resize();
     },
 
     _bindMenuEvents() {
