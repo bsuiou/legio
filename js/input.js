@@ -477,13 +477,74 @@ const Input = {
         const perpX = -dirY, perpY = dirX;
 
         // Compute target positions for each slot
+        // roleMap: index in selected[] → {x,y}  (set by role-based formations, null otherwise)
         const positions = [];
+        let roleMap = null;
         switch (formation) {
             case 'line': {
-                for (let i = 0; i < n; i++) {
-                    const offset = (i - (n - 1) / 2) * spacing;
-                    positions.push({ x: gx + perpX * offset, y: gy + perpY * offset });
+                // ── Helpers ──────────────────────────────────────────────────────────
+                const catOf  = u => TYPE_CONFIG[u.type]?.category || 'infantry';
+                const massOf = u => SIZE_CONFIG[u.size].mass;
+                // Returns arr re-ordered centre-out: [mid, mid-1, mid+1, mid-2, ...]
+                const centreOut = arr => {
+                    const r = [], mid = Math.floor(arr.length / 2);
+                    r.push(arr[mid]);
+                    for (let d = 1; d < arr.length; d++) {
+                        if (mid - d >= 0)          r.push(arr[mid - d]);
+                        if (mid + d < arr.length)  r.push(arr[mid + d]);
+                    }
+                    return r;
+                };
+
+                // ── Categorise & sort heaviest-first within each role ─────────────
+                const infantry = selected.filter(u => catOf(u) === 'infantry').sort((a,b) => massOf(b)-massOf(a));
+                const cavalry  = selected.filter(u => catOf(u) === 'cavalry') .sort((a,b) => massOf(b)-massOf(a));
+                const archers  = selected.filter(u => catOf(u) === 'archers');
+
+                const nFront    = infantry.length + cavalry.length;
+                const nCavLeft  = Math.ceil(cavalry.length / 2);   // left-flank count
+                const nCavRight = Math.floor(cavalry.length / 2);  // right-flank count
+
+                // ── Front-line world positions (perpendicular to movement dir) ─────
+                const frontSlots = [];
+                for (let i = 0; i < nFront; i++) {
+                    const off = (i - (nFront - 1) / 2) * spacing;
+                    frontSlots.push({ x: gx + perpX * off, y: gy + perpY * off });
                 }
+
+                roleMap = {};
+
+                // Infantry → centre section [nCavLeft … nCavLeft+nInf-1],
+                // heaviest at centre spreading outward
+                const infSlots = Array.from({ length: infantry.length }, (_, i) => nCavLeft + i);
+                const infOrder = centreOut(infSlots);
+                infantry.forEach((u, i) => {
+                    roleMap[selected.indexOf(u)] = frontSlots[infOrder[i]];
+                });
+
+                // Cavalry → flanks, heaviest closest to infantry on each flank
+                // Left flank  slots: [nCavLeft-1, nCavLeft-2, … 0]  (inward-first)
+                // Right flank slots: [nCavLeft+nInf, nCavLeft+nInf+1, …] (inward-first)
+                const leftSlots  = Array.from({ length: nCavLeft  }, (_, i) => nCavLeft - 1 - i);
+                const rightSlots = Array.from({ length: nCavRight }, (_, i) => nCavLeft + infantry.length + i);
+                let li = 0, ri = 0;
+                cavalry.forEach(u => {
+                    // Alternate right/left so the heaviest cavalry anchor each flank equally
+                    const slot = (ri < rightSlots.length && (li >= leftSlots.length || ri <= li))
+                        ? rightSlots[ri++]
+                        : leftSlots[li++];
+                    roleMap[selected.indexOf(u)] = frontSlots[slot];
+                });
+
+                // Archers → second line, spread evenly 1.2× spacing behind front
+                const backDist = spacing * 1.2;
+                archers.forEach((u, i) => {
+                    const off = (i - (archers.length - 1) / 2) * spacing;
+                    roleMap[selected.indexOf(u)] = {
+                        x: gx + perpX * off - dirX * backDist,
+                        y: gy + perpY * off - dirY * backDist
+                    };
+                });
                 break;
             }
             case 'column': {
@@ -520,11 +581,21 @@ const Input = {
             }
         }
 
-        // Assign units to nearest positions to avoid crossing paths
-        const assignment = this._matchUnitsToPositions(selected, positions);
-        for (let p = 0; p < assignment.length; p++) {
-            selected[assignment[p]].targetX = positions[p].x;
-            selected[assignment[p]].targetY = positions[p].y;
+        // Apply assignments — role-based formations set targets directly;
+        // all others use nearest-position matching to avoid crossing paths
+        if (roleMap) {
+            for (let i = 0; i < selected.length; i++) {
+                if (roleMap[i]) {
+                    selected[i].targetX = roleMap[i].x;
+                    selected[i].targetY = roleMap[i].y;
+                }
+            }
+        } else {
+            const assignment = this._matchUnitsToPositions(selected, positions);
+            for (let p = 0; p < assignment.length; p++) {
+                selected[assignment[p]].targetX = positions[p].x;
+                selected[assignment[p]].targetY = positions[p].y;
+            }
         }
 
         // Update attack-move targets if active
