@@ -36,7 +36,7 @@ canvas {
 #mainMenu {
     background:
         linear-gradient(rgba(20, 12, 4, 0.55), rgba(20, 12, 4, 0.55)),
-        url('../assets/menu-bg.jpg') center center / cover no-repeat;
+        url('../assets/menu-bg/rome-italy-11-january-2025-600nw-2681378233.webp') center center / cover no-repeat;
 }
 
 .overlay.hidden {
