@@ -259,16 +259,22 @@ const Renderer = {
         ctx.fill();
         ctx.stroke();
 
-        // ★★ inside the shape for veteran units — rotates with the unit model
+        // ★ ★ inside the shape for veteran units — one at 25% height, one at 75%
         if (unit._veteranId) {
             const starHalfH = sc.shape === 'square' ? sc.size / 2 : sc.height / 2;
-            const starY = starHalfH * 0.45;
+            const star1Y = -starHalfH * 0.5; // 25% from top
+            const star2Y =  starHalfH * 0.5; // 75% from top
             const starSize = Math.max(5, halfMin * 0.5);
-            ctx.fillStyle = '#f0d040';
             ctx.font = `bold ${starSize}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('\u2605\u2605', 0, starY);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.strokeText('\u2605', 0, star1Y);
+            ctx.strokeText('\u2605', 0, star2Y);
+            ctx.fillStyle = '#f0d040';
+            ctx.fillText('\u2605', 0, star1Y);
+            ctx.fillText('\u2605', 0, star2Y);
         }
 
         ctx.restore();

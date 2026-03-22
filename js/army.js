@@ -54,11 +54,16 @@ function unitSymbolHTML(type, size, small, veteran = false) {
         svgContent += `<circle cx="${cx}" cy="${cy}" r="${dotR}" fill="${symColor}"/>`;
     }
 
-    // 4. Veteran ★★ inside the shape (lower centre)
+    // 4. Veteran ★ at 25% and 75% of shape height, with dark outline for visibility
     if (veteran) {
         const starFontSize = Math.max(5, Math.round(svgH * 0.28));
-        const starY = y0 + (svgH - bw) * 0.76;
-        svgContent += `<text x="${cx}" y="${starY}" text-anchor="middle" dominant-baseline="middle" font-size="${starFontSize}" font-weight="bold" fill="#f0d040">★★</text>`;
+        const star1Y = y0 + (svgH - bw) * 0.25;
+        const star2Y = y0 + (svgH - bw) * 0.75;
+        const starAttrs = `text-anchor="middle" dominant-baseline="middle" font-size="${starFontSize}" font-weight="bold"`;
+        svgContent += `<text x="${cx}" y="${star1Y}" ${starAttrs} fill="rgba(0,0,0,0.8)" stroke="rgba(0,0,0,0.8)" stroke-width="1" paint-order="stroke">★</text>`;
+        svgContent += `<text x="${cx}" y="${star1Y}" ${starAttrs} fill="#f0d040">★</text>`;
+        svgContent += `<text x="${cx}" y="${star2Y}" ${starAttrs} fill="rgba(0,0,0,0.8)" stroke="rgba(0,0,0,0.8)" stroke-width="1" paint-order="stroke">★</text>`;
+        svgContent += `<text x="${cx}" y="${star2Y}" ${starAttrs} fill="#f0d040">★</text>`;
     }
 
     // 5. Border on top so it's always visible above fill and triangle
