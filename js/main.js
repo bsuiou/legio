@@ -404,6 +404,23 @@ const Game = {
                 </div>
 
                 <div class="mod-section">
+                    <h3>Unit Mass &amp; Push Resistance</h3>
+                    <table class="mod-table">
+                        <tr><td>Century mass</td><td>1</td></tr>
+                        <tr><td>Cohort mass</td><td>4</td></tr>
+                        <tr><td>Legion mass</td><td>12</td></tr>
+                        <tr><td>Engaged unit displacement threshold</td><td>Pusher must exceed 50% of defender's effective mass</td></tr>
+                        <tr><td>Max backward displacement factor</td><td>0.08&times; (reached at 2&times; effective mass)</td></tr>
+                        <tr><td>Rear support range</td><td>70 px behind front-line unit</td></tr>
+                        <tr><td>Rear support mass contribution</td><td>+70% of supporter's mass to front-line effective mass</td></tr>
+                        <tr><td>Example — Century vs locked Cohort</td><td>No displacement (ratio 0.25 &lt; threshold)</td></tr>
+                        <tr><td>Example — Cohort vs locked Cohort</td><td>Very light push (ratio 1.0)</td></tr>
+                        <tr><td>Example — Legion vs locked Century</td><td>Full gentle push (ratio 12)</td></tr>
+                        <tr><td>Friendly units pressing toward locked ally</td><td>Soft deflection (0.08&times;) — rear ranks hold close</td></tr>
+                    </table>
+                </div>
+
+                <div class="mod-section">
                     <h3>Special Actions</h3>
                     <table class="mod-table">
                         <tr><td>Hold ground (H key)</td><td>Unit won't auto-engage enemies</td></tr>
