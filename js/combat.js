@@ -269,17 +269,47 @@ const Combat = {
         return { from: { x: archer.x, y: archer.y }, to: { x: target.x, y: target.y } };
     },
 
-    // Push apart overlapping units (not combat-locked pairs)
-    // Only acts when units significantly overlap (>2px into each other)
+    // Push apart overlapping units (not combat-locked pairs).
+    // Locked (engaged) units are near-immovable: an enemy must exceed their effective
+    // mass before any backward displacement occurs.  Friendly rear-supporters boost
+    // the effective mass of the front-line unit they stand behind.
     resolveAllCollisions(allUnits) {
-        const pushX = new Float32Array(allUnits.length);
-        const pushY = new Float32Array(allUnits.length);
+        const n = allUnits.length;
+        const pushX = new Float32Array(n);
+        const pushY = new Float32Array(n);
 
-        for (let i = 0; i < allUnits.length; i++) {
+        // --- Precompute effective mass for every locked unit ---
+        // Effective mass = own mass + 70% of each friendly unit within 70px in the rear arc.
+        const effMass = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            const u = allUnits[i];
+            if (!u.alive) { effMass[i] = 1; continue; }
+            let mass = u.getMass();
+            if (u.inCombat) {
+                const fx = Math.cos(u.angle);
+                const fy = Math.sin(u.angle);
+                for (let k = 0; k < n; k++) {
+                    if (k === i) continue;
+                    const s = allUnits[k];
+                    if (!s.alive || s.team !== u.team) continue;
+                    const sdx = s.x - u.x;
+                    const sdy = s.y - u.y;
+                    const sdSq = sdx * sdx + sdy * sdy;
+                    if (sdSq > 70 * 70) continue;
+                    // dotNorm < -0.3 → support unit is in the rear ~107° arc
+                    const dotNorm = (sdx * fx + sdy * fy) / Math.sqrt(sdSq);
+                    if (dotNorm < -0.3) mass += s.getMass() * 0.7;
+                }
+            }
+            effMass[i] = mass;
+        }
+
+        // --- Resolve pairwise collisions ---
+        for (let i = 0; i < n; i++) {
             const a = allUnits[i];
             if (!a.alive) continue;
             const boundA = a.getBoundingRadius();
-            for (let j = i + 1; j < allUnits.length; j++) {
+            for (let j = i + 1; j < n; j++) {
                 const b = allUnits[j];
                 if (!b.alive) continue;
                 if (a.combatTargets.includes(b)) continue;
@@ -287,7 +317,6 @@ const Combat = {
                 const dx = b.x - a.x;
                 const dy = b.y - a.y;
                 const distSq = dx * dx + dy * dy;
-                // Quick reject using bounding circles (conservative upper bound)
                 const maxTouchDist = boundA + b.getBoundingRadius();
                 if (distSq >= maxTouchDist * maxTouchDist) continue;
 
@@ -296,39 +325,62 @@ const Combat = {
 
                 const nx = dx / dist;
                 const ny = dy / dist;
-                // Precise OBB-projected touch distance accounting for each unit's orientation
                 const touchDist = a.getProjectedRadius(nx, ny) + b.getProjectedRadius(nx, ny);
                 const penetration = touchDist - dist;
-                // Dead zone: ignore overlaps smaller than 1px to prevent micro-jitter
                 if (penetration < 1) continue;
+
                 const aLocked = a.inCombat;
                 const bLocked = b.inCombat;
                 if (aLocked && bLocked) continue;
 
-                // Same-team moving units get soft collisions to prevent blob clumping
                 const sameTeam = a.team === b.team;
-                const bothMoving = !aLocked && !bLocked && a.targetX !== null && b.targetX !== null;
-                const pushFactor = (sameTeam && bothMoving) ? 0.12 : 0.35;
-                const push = (penetration - 1) * pushFactor;
 
-                if (aLocked) {
-                    pushX[j] += nx * push;
-                    pushY[j] += ny * push;
-                } else if (bLocked) {
+                if (!aLocked && !bLocked) {
+                    // Both free — gentle separation; softer for same-team blobs
+                    const bothMoving = a.targetX !== null && b.targetX !== null;
+                    const factor = (sameTeam && bothMoving) ? 0.12 : 0.35;
+                    const push = (penetration - 1) * factor * 0.5;
                     pushX[i] -= nx * push;
                     pushY[i] -= ny * push;
+                    pushX[j] += nx * push;
+                    pushY[j] += ny * push;
+
                 } else {
-                    pushX[i] -= nx * push * 0.5;
-                    pushY[i] -= ny * push * 0.5;
-                    pushX[j] += nx * push * 0.5;
-                    pushY[j] += ny * push * 0.5;
+                    // One locked, one free
+                    const [li, fi] = aLocked ? [i, j] : [j, i];
+                    const [locked, free] = aLocked ? [a, b] : [b, a];
+                    // Direction from locked toward free (+1 if aLocked, -1 if bLocked)
+                    const sign = aLocked ? 1 : -1;
+
+                    if (sameTeam) {
+                        // Friendly moving toward own locked unit — soft deflection so
+                        // rear supporters can press close without bouncing away
+                        const push = (penetration - 1) * 0.08;
+                        pushX[fi] += nx * push * sign;
+                        pushY[fi] += ny * push * sign;
+                    } else {
+                        // Enemy pressing against a locked unit.
+                        // Free (enemy) unit deflects normally.
+                        const deflect = (penetration - 1) * 0.35;
+                        pushX[fi] += nx * deflect * sign;
+                        pushY[fi] += ny * deflect * sign;
+
+                        // Locked unit resists based on its effective mass vs the pusher.
+                        // massRatio must exceed 0.5 before any displacement begins;
+                        // full displacement factor (0.08) reached at massRatio ≥ 2.0.
+                        const massRatio = free.getMass() / effMass[li];
+                        const resistFactor = Math.max(0, Math.min(1, (massRatio - 0.5) / 1.5));
+                        const backPush = (penetration - 1) * 0.08 * resistFactor;
+                        pushX[li] -= nx * backPush * sign;
+                        pushY[li] -= ny * backPush * sign;
+                    }
                 }
             }
         }
 
-        // Apply accumulated pushes once
+        // Apply accumulated pushes
         const _blocked = (px, py, r) => GameMap.isDitchBlocking(px, py, r) || GameMap.isRiverBlocking(px, py, r);
-        for (let i = 0; i < allUnits.length; i++) {
+        for (let i = 0; i < n; i++) {
             if (pushX[i] === 0 && pushY[i] === 0) continue;
             const u = allUnits[i];
             if (!u.alive) continue;
