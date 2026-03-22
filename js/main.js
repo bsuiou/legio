@@ -1486,6 +1486,9 @@ const Game = {
                 if (Network.isMultiplayer && !Network.isHost) {
                     // Guest: interpolate between state snapshots for smooth movement
                     this._mpInterpolateUnits();
+                    // Compute local fog of war from the guest's own units
+                    Visibility.computeVisibility(Army.playerUnits, Visibility.playerGrid);
+                    Visibility.renderFogOverlay();
                     this._renderBattle(frameDt);
                 } else {
                     // Host or single-player: run physics
