@@ -1650,25 +1650,19 @@ const Game = {
             Renderer.drawFogOfWar();
         }
 
-        // In multiplayer the guest controls AI.units; host controls Army.playerUnits
-        const isGuestSide = Network.isMultiplayer && !Network.isHost;
-
         // Draw move targets for selected units
         if (!this.spectatorMode) {
-            Renderer.drawMoveTargets(isGuestSide ? AI.units : Army.playerUnits);
+            Renderer.drawMoveTargets(Army.playerUnits);
         }
-        const myUnits    = isGuestSide ? AI.units           : Army.playerUnits;
-        const theirUnits = isGuestSide ? Army.playerUnits   : AI.units;
-        const myTeam     = isGuestSide ? 'enemy'            : 'player';
 
-        // Draw own units (always visible)
-        for (const u of myUnits) {
+        // Draw own units (always visible) — Army.playerUnits is always the local player's army
+        for (const u of Army.playerUnits) {
             if (u.alive) Renderer.drawUnit(u);
         }
 
-        // Draw opponent units — only where our fog allows, or always in spectator
-        for (const u of theirUnits) {
-            if (u.alive && (this.spectatorMode || Visibility.isVisible(u.x, u.y, myTeam))) {
+        // Draw opponent units — only where local fog allows, or always in spectator
+        for (const u of AI.units) {
+            if (u.alive && (this.spectatorMode || Visibility.isVisible(u.x, u.y, 'player'))) {
                 Renderer.drawUnit(u);
             }
         }

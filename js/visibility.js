@@ -116,10 +116,6 @@ const Visibility = {
         const w = this.gridW;
         const h = this.gridH;
 
-        // Guest sees fog from their own units' perspective (enemyGrid)
-        const myGrid = (Network.isMultiplayer && !Network.isHost)
-            ? this.enemyGrid : this.playerGrid;
-
         // Clear previous frame first
         ctx.clearRect(0, 0, w, h);
 
@@ -127,12 +123,12 @@ const Visibility = {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
         ctx.fillRect(0, 0, w, h);
 
-        // Clear visible cells (make them transparent)
+        // Clear visible cells — playerGrid is always the local player's own vision
         ctx.globalCompositeOperation = 'destination-out';
         ctx.fillStyle = 'rgba(0, 0, 0, 1)';
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < w; x++) {
-                if (myGrid[y * w + x]) {
+                if (this.playerGrid[y * w + x]) {
                     ctx.fillRect(x, y, 1, 1);
                 }
             }
