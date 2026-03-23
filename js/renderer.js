@@ -7,6 +7,7 @@ const Renderer = {
     offsetY: 0,
     arrows: [], // active arrow projectiles for visual
     arrowTimer: 0,
+    smokeParticles: [], // { x, y, life, maxLife, vx, vy, size, alpha }
     deathMarkers: [], // { x, y, team, time } — fade out over 10s
     battleTimer: 0, // for pulsing effects
     placementTimer: 0, // for placement zone pulsing
@@ -472,17 +473,17 @@ const Renderer = {
                 ctx.fill();
                 ctx.shadowBlur = 0;
 
-                // Smoke trail — 2-3 tiny wisps above/behind the arrow
-                const numWisps = 2 + Math.floor(Math.random() * 2);
-                for (let w = 0; w < numWisps; w++) {
-                    const wx = -2 - Math.random() * 8;
-                    const wy = -(2 + Math.random() * 4);
-                    const wr = 1 + Math.random() * 1.5;
-                    const wa = 0.12 + Math.random() * 0.15;
-                    ctx.fillStyle = `rgba(80, 70, 60, ${wa.toFixed(2)})`;
-                    ctx.beginPath();
-                    ctx.arc(wx, wy, wr, 0, Math.PI * 2);
-                    ctx.fill();
+                // Spawn persistent smoke particles at arrow position (in world space)
+                if (Math.random() < 0.6) {
+                    this.smokeParticles.push({
+                        x: x + Math.cos(angle) * (-3 + Math.random() * -4),
+                        y: y + Math.sin(angle) * (-3 + Math.random() * -4),
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: -(3 + Math.random() * 5),
+                        size: 1.2 + Math.random() * 1.8,
+                        life: 0,
+                        maxLife: 0.4 + Math.random() * 0.4,
+                    });
                 }
             } else {
                 // Normal arrow
@@ -503,6 +504,29 @@ const Renderer = {
         });
 
         ctx.restore();
+
+        // Draw and update persistent smoke particles
+        if (this.smokeParticles.length > 0) {
+            const sCtx = this.ctx;
+            sCtx.save();
+            sCtx.scale(this.scale, this.scale);
+            this.smokeParticles = this.smokeParticles.filter(p => {
+                p.life += dt;
+                if (p.life >= p.maxLife) return false;
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.vy *= 0.95; // slow down drift
+                p.size += dt * 2; // expand as it dissipates
+                const fade = 1 - (p.life / p.maxLife);
+                const alpha = fade * 0.25;
+                sCtx.fillStyle = `rgba(90, 80, 70, ${alpha.toFixed(3)})`;
+                sCtx.beginPath();
+                sCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                sCtx.fill();
+                return true;
+            });
+            sCtx.restore();
+        }
     },
 
     drawSelectionBox(x1, y1, x2, y2) {

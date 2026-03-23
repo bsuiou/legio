@@ -152,6 +152,7 @@ const Game = {
                 this.gameSpeed = 1;
                 this._buildBattleUI();
                 Renderer.arrows = [];
+                Renderer.smokeParticles = [];
                 Renderer.deathMarkers = [];
                 Renderer.battleLog = [];
                 Renderer.rallyEffects = [];
