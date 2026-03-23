@@ -441,22 +441,28 @@ const Renderer = {
             ctx.rotate(angle);
 
             if (a.fire) {
-                // Fire arrow: orange-red shaft with flickering glow
+                // Fire arrow: brown shaft (65%) + burning tip (35%) with glow
                 const flicker = 0.7 + Math.random() * 0.3;
 
-                // Glow behind the arrow
-                ctx.shadowColor = 'rgba(255, 120, 20, 0.8)';
-                ctx.shadowBlur = 6 * flicker;
+                // Brown wooden shaft — back 65% (-8 to -0.8)
+                ctx.strokeStyle = '#5a4020';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-8, 0);
+                ctx.lineTo(-1, 0);
+                ctx.stroke();
 
-                // Orange-red shaft
+                // Burning tip — front 35% with glow
+                ctx.shadowColor = 'rgba(255, 120, 20, 0.8)';
+                ctx.shadowBlur = 5 * flicker;
                 ctx.strokeStyle = '#d04010';
                 ctx.lineWidth = 2.5;
                 ctx.beginPath();
-                ctx.moveTo(-8, 0);
+                ctx.moveTo(-1, 0);
                 ctx.lineTo(4, 0);
                 ctx.stroke();
 
-                // Arrowhead
+                // Glowing arrowhead
                 ctx.fillStyle = '#ff6020';
                 ctx.beginPath();
                 ctx.moveTo(2, -2.5);
@@ -464,17 +470,20 @@ const Renderer = {
                 ctx.lineTo(2, 2.5);
                 ctx.closePath();
                 ctx.fill();
-
-                // Small flame trail behind shaft
                 ctx.shadowBlur = 0;
-                const trailLen = 4 + Math.random() * 3;
-                const trailY = (Math.random() - 0.5) * 2;
-                ctx.strokeStyle = `rgba(255, ${150 + Math.floor(Math.random() * 80)}, 30, ${(0.5 + Math.random() * 0.4).toFixed(2)})`;
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(-8, 0);
-                ctx.lineTo(-8 - trailLen, trailY);
-                ctx.stroke();
+
+                // Smoke trail — 2-3 tiny wisps above/behind the arrow
+                const numWisps = 2 + Math.floor(Math.random() * 2);
+                for (let w = 0; w < numWisps; w++) {
+                    const wx = -2 - Math.random() * 8;
+                    const wy = -(2 + Math.random() * 4);
+                    const wr = 1 + Math.random() * 1.5;
+                    const wa = 0.12 + Math.random() * 0.15;
+                    ctx.fillStyle = `rgba(80, 70, 60, ${wa.toFixed(2)})`;
+                    ctx.beginPath();
+                    ctx.arc(wx, wy, wr, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             } else {
                 // Normal arrow
                 ctx.strokeStyle = '#5a4020';
