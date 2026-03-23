@@ -439,15 +439,55 @@ const Renderer = {
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(angle);
-            ctx.strokeStyle = '#5a4020';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(-8, 0);
-            ctx.lineTo(4, 0);
-            ctx.moveTo(2, -2);
-            ctx.lineTo(5, 0);
-            ctx.lineTo(2, 2);
-            ctx.stroke();
+
+            if (a.fire) {
+                // Fire arrow: orange-red shaft with flickering glow
+                const flicker = 0.7 + Math.random() * 0.3;
+
+                // Glow behind the arrow
+                ctx.shadowColor = 'rgba(255, 120, 20, 0.8)';
+                ctx.shadowBlur = 6 * flicker;
+
+                // Orange-red shaft
+                ctx.strokeStyle = '#d04010';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(-8, 0);
+                ctx.lineTo(4, 0);
+                ctx.stroke();
+
+                // Arrowhead
+                ctx.fillStyle = '#ff6020';
+                ctx.beginPath();
+                ctx.moveTo(2, -2.5);
+                ctx.lineTo(6, 0);
+                ctx.lineTo(2, 2.5);
+                ctx.closePath();
+                ctx.fill();
+
+                // Small flame trail behind shaft
+                ctx.shadowBlur = 0;
+                const trailLen = 4 + Math.random() * 3;
+                const trailY = (Math.random() - 0.5) * 2;
+                ctx.strokeStyle = `rgba(255, ${150 + Math.floor(Math.random() * 80)}, 30, ${(0.5 + Math.random() * 0.4).toFixed(2)})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-8, 0);
+                ctx.lineTo(-8 - trailLen, trailY);
+                ctx.stroke();
+            } else {
+                // Normal arrow
+                ctx.strokeStyle = '#5a4020';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-8, 0);
+                ctx.lineTo(4, 0);
+                ctx.moveTo(2, -2);
+                ctx.lineTo(5, 0);
+                ctx.lineTo(2, 2);
+                ctx.stroke();
+            }
+
             ctx.restore();
 
             return true;

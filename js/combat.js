@@ -266,7 +266,8 @@ const Combat = {
         archer.attackCooldown = 1.2;
         archer.arrowTarget = target;
 
-        return { from: { x: archer.x, y: archer.y }, to: { x: target.x, y: target.y } };
+        const fire = Campaign.active && archer.team === 'player' && Campaign._battleBuffs.fireArrows > 0;
+        return { from: { x: archer.x, y: archer.y }, to: { x: target.x, y: target.y }, fire };
     },
 
     // Push apart overlapping units (not combat-locked pairs).
