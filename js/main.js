@@ -36,6 +36,7 @@ const Game = {
         document.getElementById('endlessMap').classList.add('hidden');
 
         this.state = newState;
+        AudioManager.onStateChange(newState);
 
         switch (newState) {
             case 'MENU':
@@ -181,6 +182,12 @@ const Game = {
     },
 
     _bindMenuEvents() {
+        // Mute button
+        document.getElementById('btnMute').addEventListener('click', () => {
+            const muted = AudioManager.toggleMute();
+            document.getElementById('btnMute').textContent = muted ? '\u{1F507}' : '\u{1F50A}';
+        });
+
         document.getElementById('btnStart').addEventListener('click', () => {
             this.spectatorMode = false;
             this.setState('MAP_SELECT');
