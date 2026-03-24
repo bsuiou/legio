@@ -21,11 +21,11 @@ canvas {
     margin: 0 auto;
 }
 
-/* Mute button — always visible in top-right corner */
+/* Mute button — top right, left of speed button */
 .mute-btn {
     position: fixed;
-    top: 10px;
-    right: 10px;
+    top: 23px;
+    right: 76px;
     z-index: 9999;
     background: rgba(30, 20, 10, 0.6);
     border: 1px solid rgba(139, 105, 20, 0.4);
